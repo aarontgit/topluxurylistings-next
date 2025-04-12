@@ -19,7 +19,7 @@ import { app, db } from "../lib/firebase";
 export default function ValuationTool() {
   const [user, setUser] = useState<User | null>(null);
   const [address, setAddress] = useState("");
-  const [valuation, setValuation] = useState<any>(null);
+  const [valuation, setValuation] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ export default function ValuationTool() {
   }, []);
 
   useEffect(() => {
-    const google = (window as any).google;
+    const google = (window as any).google; // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!google || !addressInputRef.current) return;
 
     const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
@@ -140,7 +140,7 @@ export default function ValuationTool() {
         setError(null);
         fetchPropertyValuation(address);
       }
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
       console.error(err);
       setError(err.message || "Authentication or usage error.");
     }

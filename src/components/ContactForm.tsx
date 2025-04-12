@@ -13,9 +13,9 @@ export default function ContactForm() {
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!addressInputRef.current || !(window as any).google) return;
+    if (!addressInputRef.current || !(window as any).google) return; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const google = (window as any).google;
+    const google = (window as any).google; // eslint-disable-line @typescript-eslint/no-explicit-any
     const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
       types: ["address"],
       componentRestrictions: { country: "us" },
