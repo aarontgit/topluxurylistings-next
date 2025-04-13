@@ -8,12 +8,7 @@ import {
   onAuthStateChanged,
   User,
 } from "firebase/auth";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { app, db } from "../lib/firebase";
 
 export default function ValuationTool() {
@@ -61,27 +56,6 @@ export default function ValuationTool() {
       }
     });
   }, []);
-
-  const handleValuationUsage = async (userId: string) => {
-    const userRef = doc(db, "users", userId);
-    const snap = await getDoc(userRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      const count = data.valuationCount || 0;
-
-      if (data.tier !== "admin" && count >= 3) {
-        throw new Error("You’ve reached your valuation limit.");
-      }
-
-      await updateDoc(userRef, { valuationCount: count + 1 });
-    } else {
-      await setDoc(userRef, {
-        email: auth.currentUser?.email || "",
-        tier: "free",
-        valuationCount: 1,
-      });
-    }
-  };
 
   const fetchStreetView = async (addr: string) => {
     try {
@@ -135,11 +109,23 @@ export default function ValuationTool() {
         await signInWithPopup(auth, new GoogleAuthProvider());
       }
 
-      if (auth.currentUser) {
-        await handleValuationUsage(auth.currentUser.uid);
-        setError(null);
-        fetchPropertyValuation(address);
+      const idToken = await auth.currentUser?.getIdToken();
+
+      const incrementRes = await fetch("/api/incrementValuation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const result = await incrementRes.json();
+
+      if (!incrementRes.ok) {
+        setError(result.error || "Something went wrong.");
+        return;
       }
+
+      setError(null);
+      fetchPropertyValuation(address);
     } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
       console.error(err);
       setError(err.message || "Authentication or usage error.");
@@ -158,7 +144,6 @@ export default function ValuationTool() {
       setError("Error signing out.");
     }
   };
-  
 
   return (
     <div className="p-6 max-w-xl mx-auto">
@@ -206,18 +191,17 @@ export default function ValuationTool() {
         </div>
       )}
 
-        {user && (
+      {user && (
         <div className="text-sm text-gray-500 mt-4 flex justify-between items-center">
-            <p>Signed in as {user.email}</p>
-            <button
+          <p>Signed in as {user.email}</p>
+          <button
             onClick={handleSignOut}
             className="text-blue-600 underline ml-4 hover:text-blue-800 transition"
-            >
+          >
             Sign Out
-            </button>
+          </button>
         </div>
-        )}
-
+      )}
     </div>
   );
 }
