@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const userRef = adminDb.collection("users").doc(uid);
     const snap = await userRef.get();
 
-    let data = snap.data();
+    const data = snap.data();
 
     if (!snap.exists) {
       // Auto-create user doc
