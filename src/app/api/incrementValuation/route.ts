@@ -1,8 +1,8 @@
+// /app/api/incrementValuation/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
-import { adminDb } from "../../../lib/firebaseAdmin";
+import { adminDb } from "../../../lib/firebaseAdmin"; // update path as needed
 
-// POST /api/increment-valuation
 export async function POST(req: NextRequest) {
   try {
     const { idToken } = await req.json();
@@ -11,30 +11,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing token" }, { status: 401 });
     }
 
-    // Verify token and extract user ID
-    const decoded = await getAuth().verifyIdToken(idToken);
-    const uid = decoded.uid;
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    const email = decodedToken.email || "";
 
     const userRef = adminDb.collection("users").doc(uid);
-    const snapshot = await userRef.get();
+    const snap = await userRef.get();
 
-    if (!snapshot.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    let data = snap.data();
+
+    if (!snap.exists) {
+      // Auto-create user doc
+      await userRef.set({
+        email,
+        tier: "free",
+        valuationCount: 1,
+      });
+      return NextResponse.json({ success: true });
     }
 
-    const userData = snapshot.data();
-    const currentCount = userData?.valuationCount ?? 0;
-    const tier = userData?.tier ?? "free";
+    const count = data?.valuationCount || 0;
+    const tier = data?.tier || "free";
 
-    if (tier !== "admin" && currentCount >= 3) {
+    if (tier !== "admin" && count >= 3) {
       return NextResponse.json({ error: "Valuation limit reached" }, { status: 403 });
     }
 
-    await userRef.update({ valuationCount: currentCount + 1 });
+    await userRef.update({ valuationCount: count + 1 });
 
-    return NextResponse.json({ success: true, newCount: currentCount + 1 });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Error in /api/increment-valuation:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Increment route error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
