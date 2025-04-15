@@ -120,7 +120,12 @@ export default function ValuationTool() {
           return;
         }
       }
-  
+      
+      if (!auth.currentUser) {
+        setError("You must be signed in to get a valuation.");
+        return;
+      }
+      
       const idToken = await currentUser.getIdToken();
       const incrementRes = await fetch("/api/incrementValuation", {
         method: "POST",

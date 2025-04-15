@@ -12,6 +12,11 @@ export async function POST(req: NextRequest) {
     }
 
     const decodedToken = await getAuth().verifyIdToken(idToken);
+    if (!decodedToken || !decodedToken.uid) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      
+
     const uid = decodedToken.uid;
     const email = decodedToken.email || "";
 
