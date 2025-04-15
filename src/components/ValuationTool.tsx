@@ -99,38 +99,49 @@ export default function ValuationTool() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+  
     if (!address) {
       setError("Please select a valid address from the dropdown.");
       return;
     }
-
+  
     try {
       if (!user) {
-        await signInWithPopup(auth, new GoogleAuthProvider());
+        console.log("🟡 Attempting sign-in with popup...");
+  
+        try {
+          const result = await signInWithPopup(auth, new GoogleAuthProvider());
+          console.log("✅ Sign-in successful:", result.user.email);
+        } catch (popupError) {
+          console.error("❌ Popup sign-in failed, fallback may occur:", popupError);
+          setError("Popup sign-in failed. Try allowing popups or checking browser settings.");
+          return;
+        }
       }
-
+  
       const idToken = await auth.currentUser?.getIdToken();
-
+  
       const incrementRes = await fetch("/api/incrementValuation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
-
+  
       const result = await incrementRes.json();
-
+  
       if (!incrementRes.ok) {
         setError(result.error || "Something went wrong.");
         return;
       }
-
+  
       setError(null);
       fetchPropertyValuation(address);
     } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-      console.error(err);
+      console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
     }
   };
+  
 
   const handleSignOut = async () => {
     try {
