@@ -6,7 +6,6 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 export default function NavBar() {
-  const pathname = usePathname();
 
   return (
     <nav className="bg-[#0E0E0B] text-white shadow-md">
