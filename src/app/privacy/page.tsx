@@ -6,6 +6,7 @@ import Footer from "../../components/Footer";
 
 export default function PrivacyPolicy() {
   return (
+    <div className="pt-28">
     <div className="min-h-screen flex flex-col">
       <NavBar />
       <main className="flex-1 max-w-3xl mx-auto p-6 space-y-6">
@@ -63,6 +64,7 @@ export default function PrivacyPolicy() {
         </p>
       </main>
       <Footer />
+    </div>
     </div>
   );
 }

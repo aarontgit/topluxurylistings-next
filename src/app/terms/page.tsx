@@ -4,6 +4,7 @@ import Footer from "../../components/Footer";
 
 export default function TermsOfService() {
   return (
+    <div className="pt-28">
     <div className="min-h-screen flex flex-col">
       <NavBar />
       <main className="flex-1 max-w-3xl mx-auto p-6">
@@ -54,6 +55,7 @@ export default function TermsOfService() {
         </p>
       </main>
       <Footer />
+    </div>
     </div>
   );
 }

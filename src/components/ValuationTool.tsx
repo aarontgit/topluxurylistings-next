@@ -14,7 +14,7 @@ import { app, db } from "../lib/firebase";
 export default function ValuationTool() {
   const [user, setUser] = useState<User | null>(null);
   const [address, setAddress] = useState("");
-  const [valuation, setValuation] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [valuation, setValuation] = useState<any>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,7 @@ export default function ValuationTool() {
   }, []);
 
   useEffect(() => {
-    const google = (window as any).google; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const google = (window as any).google;
     if (!google || !addressInputRef.current) return;
 
     const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
@@ -106,21 +106,22 @@ export default function ValuationTool() {
     }
   
     try {
-      if (!user) {
-        console.log("🟡 Attempting sign-in with popup...");
+      let currentUser = user;
   
+      // If user not signed in, trigger sign-in
+      if (!currentUser) {
         try {
           const result = await signInWithPopup(auth, new GoogleAuthProvider());
-          console.log("✅ Sign-in successful:", result.user.email);
+          currentUser = result.user;
+          setUser(result.user); // update state
         } catch (popupError) {
-          console.error("❌ Popup sign-in failed, fallback may occur:", popupError);
+          console.error("❌ Popup sign-in failed:", popupError);
           setError("Popup sign-in failed. Try allowing popups or checking browser settings.");
           return;
         }
       }
   
-      const idToken = await auth.currentUser?.getIdToken();
-  
+      const idToken = await currentUser.getIdToken();
       const incrementRes = await fetch("/api/incrementValuation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,7 +137,7 @@ export default function ValuationTool() {
   
       setError(null);
       fetchPropertyValuation(address);
-    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
       console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
     }
@@ -157,29 +158,50 @@ export default function ValuationTool() {
   };
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Home Valuation Tool</h2>
+    <div className="relative min-h-screen text-white">
+      {/* Background Image */}
+      <div className="absolute inset-0 bg-[url('/blue-tinted-hero.png')] bg-cover bg-center brightness-75 z-0"></div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          ref={addressInputRef}
-          placeholder="Enter Property Address"
-          className="w-full p-3 border border-gray-300 rounded"
-          required
-        />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button
-          type="submit"
-          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
-        >
-          {loading ? "Evaluating..." : "Get Valuation"}
-        </button>
-      </form>
+      {/* Overlay Content */}
+      <div
+        className={`relative z-10 px-6 flex flex-col items-center ${
+          !valuation ? "min-h-screen justify-center" : "pt-20"
+        }`}
+      >
+        <div className="w-full max-w-2xl mx-auto text-center px-4">
+          <h1 className="text-4xl md:text-5xl font-semibold mb-4">Estimate your home’s value</h1>
+          <p className="mb-6 text-lg text-gray-100">
+            Enter your address to get a free estimated market value of your property.
+          </p>
 
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <input
+              type="text"
+              ref={addressInputRef}
+              placeholder="Enter address"
+              className="w-full sm:w-[400px] px-4 py-3 rounded-md text-gray-900 border border-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+            <button
+              type="submit"
+              className="bg-white text-blue-700 font-medium px-6 py-3 rounded-md hover:bg-gray-200 transition"
+            >
+              {loading ? "Evaluating..." : "Get Valuation"}
+            </button>
+          </form>
+
+          {error && <p className="mt-4 text-red-300 text-sm">{error}</p>}
+        </div>
+      </div>
+
+      {/* Valuation Result Section */}
       {valuation && (
-        <div className="mt-6 bg-white p-4 rounded shadow space-y-3">
-          <h3 className="text-xl font-semibold">Estimated Home Value</h3>
+         <div className="bg-white text-gray-800 py-8 px-6 mt-12 z-20 relative shadow-xl rounded-xl w-full max-w-xl mx-auto">
+
+          <h2 className="text-2xl font-semibold mb-4">Your Estimated Home Value</h2>
           <p>
             <strong>Estimate:</strong>{" "}
             {valuation.price != null
@@ -196,21 +218,9 @@ export default function ValuationTool() {
             <img
               src={imageUrl}
               alt="Property view"
-              className="rounded mt-4 w-full max-h-64 object-cover"
+              className="mt-4 rounded-md w-full max-h-64 object-cover"
             />
           )}
-        </div>
-      )}
-
-      {user && (
-        <div className="text-sm text-gray-500 mt-4 flex justify-between items-center">
-          <p>Signed in as {user.email}</p>
-          <button
-            onClick={handleSignOut}
-            className="text-blue-600 underline ml-4 hover:text-blue-800 transition"
-          >
-            Sign Out
-          </button>
         </div>
       )}
     </div>

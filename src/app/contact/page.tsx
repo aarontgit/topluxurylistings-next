@@ -5,6 +5,7 @@ import ContactForm from "../../components/ContactForm";
 
 export default function ContactPage() {
   return (
+    <div className="pt-28">
     <>
       <NavBar />
       <main className="max-w-2xl mx-auto p-6">
@@ -17,5 +18,6 @@ export default function ContactPage() {
       </main>
       <Footer />
     </>
+    </div>
   );
 }

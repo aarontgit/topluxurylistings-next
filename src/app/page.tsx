@@ -1,46 +1,70 @@
+// src/app/page.tsx
+"use client";
+
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f0ece8] to-[#e8e4df] text-gray-900">
+    <div className="min-h-screen flex flex-col text-white">
       <NavBar />
 
-      <main className="flex-grow flex flex-col items-center justify-center px-6 py-20 text-center">
-        <h1 className="text-4xl md:text-5xl font-extrabold mb-6 leading-tight max-w-3xl">
-          Get the Most for Your Home — Effortlessly
-        </h1>
-        <p className="text-lg md:text-xl max-w-xl mb-10">
-          Our expert-backed platform helps you sell your home faster and for top dollar. No stress. No guesswork. Just results.
-        </p>
-        <a
-          href="/contact"
-          className="inline-block bg-blue-700 text-white text-lg font-medium px-6 py-3 rounded-full shadow hover:bg-blue-800 transition"
-        >
-          Request a Free Consultation
-        </a>
-      </main>
+      {/* Hero section with gradient */}
+      <div className="bg-gradient-to-b from-[#0E0E0B] to-[#3A3A34]">
+        <main className="pt-28 px-6 md:px-12 lg:px-24 text-center">
+          <div className="max-w-4xl mx-auto py-12">
+            <h1 className="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
+              Get the Most for Your Home
+            </h1>
+            <p className="text-lg md:text-xl text-gray-300 mb-8">
+              Top Luxury Listings connects discerning buyers with premium homes.
+              Our valuation tool gives you a data-driven edge when preparing to sell.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-6">
+              <Link href="/valuation">
+                <span className="inline-block px-8 py-4 bg-gold-500 text-black font-semibold rounded hover:bg-gold-400 transition">
+                  Get a Valuation
+                </span>
+              </Link>
+              <Link href="/contact">
+                <span className="inline-block px-8 py-4 border border-gold-500 text-gold-500 font-semibold rounded hover:bg-gold-500 hover:text-black transition">
+                  Contact Us
+                </span>
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
 
-      <section className="bg-white py-16 px-6 text-center">
-        <h2 className="text-3xl font-semibold mb-4">Why Homeowners Choose Us</h2>
-        <p className="text-gray-600 max-w-2xl mx-auto mb-8">
-          With deep market knowledge, strategic pricing, and expert presentation, we help homeowners like you get more from your most valuable asset.
-        </p>
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+      {/* Content below gradient */}
+      <main className="flex-1 px-6 md:px-12 lg:px-24 text-black bg-white">
+        <div className="max-w-6xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           <div>
-            <h3 className="text-xl font-bold mb-2">Top Market Insights</h3>
-            <p className="text-gray-600">Our data-backed analysis ensures your home is priced to sell for maximum return.</p>
+            <h2 className="text-3xl font-bold mb-4 text-[#0E0E0B]">
+              Why Choose Top Luxury Listings?
+            </h2>
+            <p className="text-gray-700 mb-4">
+              Our experienced team and modern tools provide homeowners with accurate insights and unmatched exposure to high-net-worth buyers. We prioritize presentation, precision, and professionalism.
+            </p>
+            <ul className="list-disc list-inside text-gray-600">
+              <li>Expert Valuation Tools</li>
+              <li>High-End Market Visibility</li>
+              <li>Dedicated Concierge Service</li>
+            </ul>
           </div>
-          <div>
-            <h3 className="text-xl font-bold mb-2">Effortless Experience</h3>
-            <p className="text-gray-600">We handle the details so you can focus on your next chapter.</p>
-          </div>
-          <div>
-            <h3 className="text-xl font-bold mb-2">Trusted by Sellers</h3>
-            <p className="text-gray-600">Join hundreds of satisfied homeowners who got more by working with us.</p>
+          <div className="flex justify-center">
+            <Image
+              src="/hero.png"
+              alt="Luxury Home"
+              width={500}
+              height={400}
+              className="rounded-lg shadow-lg object-cover"
+            />
           </div>
         </div>
-      </section>
+      </main>
 
       <Footer />
     </div>
