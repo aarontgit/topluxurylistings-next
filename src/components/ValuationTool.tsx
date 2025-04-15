@@ -13,8 +13,8 @@ import { app, db } from "../lib/firebase";
 
 export default function ValuationTool() {
   const [user, setUser] = useState<User | null>(null);
-  const [address, setAddress] = useState("");
-  const [valuation, setValuation] = useState<any>(null); // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [address, setAddress] = useState(""); // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [valuation, setValuation] = useState<any>(null); 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,8 +39,8 @@ export default function ValuationTool() {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const google = (window as any).google;
+  useEffect(() => { // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const google = (window as any).google;  
     if (!google || !addressInputRef.current) return;
 
     const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
@@ -136,8 +136,8 @@ export default function ValuationTool() {
       }
   
       setError(null);
-      fetchPropertyValuation(address);
-    } catch (err: any) { // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fetchPropertyValuation(address); // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) { 
       console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
     }
