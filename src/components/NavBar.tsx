@@ -1,19 +1,28 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function NavBar() {
   return (
-    <nav className="bg-white border-b shadow px-6 py-4 mb-6">
-      <div className="max-w-4xl mx-auto flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Top Luxury Listings</h1>
-        <div className="space-x-4">
-          <Link href="/" className="text-blue-600 hover:underline">
-            Home
-          </Link>
-          <Link href="/valuation" className="text-blue-600 hover:underline">
-            Valuation Tool
-          </Link>
+    <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: "#EFEAE4" }}>
+      <Link href="/">
+        <div className="cursor-pointer">
+          <Image
+            src="/logo.png"
+            alt="Top Luxury Listings Logo"
+            width={90}
+            height={90}
+            priority
+          />
         </div>
-      </div>
-    </nav>
+      </Link>
+      <nav className="space-x-6 text-sm font-medium">
+        <Link href="/valuation" className="text-gray-800 hover:underline">
+          Valuation Tool
+        </Link>
+        <Link href="/contact" className="text-gray-800 hover:underline">
+          Contact
+        </Link>
+      </nav>
+    </header>
   );
 }
