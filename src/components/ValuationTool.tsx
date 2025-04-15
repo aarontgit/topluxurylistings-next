@@ -14,7 +14,7 @@ import { app, db } from "../lib/firebase";
 export default function ValuationTool() {
   const [user, setUser] = useState<User | null>(null);
   const [address, setAddress] = useState("");
-  const [valuation, setValuation] = useState<any>(null);
+  const [valuation, setValuation] = useState<any>(null); // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -137,25 +137,12 @@ export default function ValuationTool() {
   
       setError(null);
       fetchPropertyValuation(address);
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-next-line @typescript-eslint/no-explicit-any
       console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
     }
   };
   
-
-  const handleSignOut = async () => {
-    try {
-      await auth.signOut();
-      setUser(null);
-      setValuation(null);
-      setAddress("");
-      setError(null);
-    } catch (err) {
-      console.error("Sign out error:", err);
-      setError("Error signing out.");
-    }
-  };
 
   return (
     <div className="relative min-h-screen text-white">
