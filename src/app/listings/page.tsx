@@ -12,7 +12,7 @@ export default function ComingSoonPage() {
             Our Listings and Agents pages are currently under development.  
             Stay tuned for exclusive properties and trusted professionals!
           </p>
-          <div className="text-gray-400 text-sm">© {new Date().getFullYear()} YourBrandName</div>
+          <div className="text-gray-400 text-sm">© {new Date().getFullYear()} TopLuxuryListings</div>
         </div>
       </main>
       <Footer />
