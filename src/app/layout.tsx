@@ -4,6 +4,7 @@ import "./globals.css";
 
 import Script from "next/script";
 import GtagPageView from "../components/GtagPageview";
+import { Suspense } from "react";
 
 
 const geistSans = Geist({
@@ -58,7 +59,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <GtagPageView /> 
+        <Suspense fallback={null}>
+          <GtagPageView />
+        </Suspense>
         {children}
       </body>
     </html>
