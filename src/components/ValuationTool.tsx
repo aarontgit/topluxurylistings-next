@@ -12,8 +12,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { app, db } from "../lib/firebase";
 
 export default function ValuationTool() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [user, setUser] = useState<User | null>(null);
+  const [_user, setUser] = useState<User | null>(null);
   const [address, setAddress] = useState(""); // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [valuation, setValuation] = useState<any>(null); 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
