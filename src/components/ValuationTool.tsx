@@ -12,6 +12,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { app, db } from "../lib/firebase";
 
 export default function ValuationTool() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<User | null>(null);
   const [address, setAddress] = useState(""); // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [valuation, setValuation] = useState<any>(null); 
@@ -37,7 +38,7 @@ export default function ValuationTool() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [auth]);
 
   useEffect(() => { // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const google = (window as any).google;  
@@ -156,7 +157,7 @@ export default function ValuationTool() {
       }
   
       setError(null);
-      fetchPropertyValuation(address);
+      fetchPropertyValuation(address);  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
