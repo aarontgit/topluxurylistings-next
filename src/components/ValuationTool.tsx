@@ -105,28 +105,43 @@ export default function ValuationTool() {
       return;
     }
   
-    try {
-      let currentUser = user;
+    const currentUser = auth.currentUser;
   
-      // If user not signed in, trigger sign-in
-      if (!currentUser) {
-        try {
-          const result = await signInWithPopup(auth, new GoogleAuthProvider());
-          currentUser = result.user;
-          setUser(result.user); // update state
-        } catch (popupError) {
-          console.error("❌ Popup sign-in failed:", popupError);
-          setError("Popup sign-in failed. Try allowing popups or checking browser settings.");
-          return;
-        }
-      }
-      
-      if (!auth.currentUser) {
-        setError("You must be signed in to get a valuation.");
+    if (!currentUser) {
+      // 🔹 Track guest click
+      window.gtag?.('event', 'get_valuation_clicked_guest', {
+        event_category: 'Engagement',
+        event_label: address,
+      });
+  
+      setError("You must be signed in to get a valuation.");
+      try {
+        const result = await signInWithPopup(auth, new GoogleAuthProvider());
+        setUser(result.user); // Update state
+  
+        // ✅ Track sign-in success after guest valuation click
+        window.gtag?.('event', 'get_valuation_signin_success', {
+          event_category: 'Auth',
+          user_email: result.user.email,
+        });
+  
+        return handleSubmit(e); // Re-submit with now-signed-in user
+      } catch (popupError) {
+        console.error("❌ Popup sign-in failed:", popupError);
+        setError("Popup sign-in failed. Try allowing popups or checking browser settings.");
         return;
       }
-      
-      const idToken = await currentUser.getIdToken();
+    } else {
+      // ✅ Track signed-in user click
+      window.gtag?.('event', 'get_valuation_clicked_signedin', {
+        event_category: 'Engagement',
+        event_label: address,
+        user_email: currentUser.email,
+      });
+    }
+  
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
       const incrementRes = await fetch("/api/incrementValuation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,12 +156,13 @@ export default function ValuationTool() {
       }
   
       setError(null);
-      fetchPropertyValuation(address); // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) { 
+      fetchPropertyValuation(address);
+    } catch (err: any) {
       console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
     }
   };
+  
   
 
   return (

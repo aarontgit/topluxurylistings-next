@@ -27,7 +27,18 @@ export default function NavBar() {
 
   const handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      // 🔹 Track manual sign-in attempt
+      window.gtag?.('event', 'manual_signin_clicked', {
+        event_category: 'Auth',
+      });
+  
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+  
+      // ✅ Track sign-in success
+      window.gtag?.('event', 'manual_signin_success', {
+        event_category: 'Auth',
+        user_email: result.user.email,
+      });
     } catch (error) {
       console.error("Sign-in error:", error);
     }
@@ -35,6 +46,12 @@ export default function NavBar() {
 
   const handleSignOut = async () => {
     try {
+      // ✅ Track sign-out
+      window.gtag?.('event', 'user_signed_out', {
+        event_category: 'Auth',
+        user_email: auth.currentUser?.email || "(unknown)",
+      });
+  
       await signOut(auth);
     } catch (error) {
       console.error("Sign-out error:", error);
