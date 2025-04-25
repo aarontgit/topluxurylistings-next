@@ -16,7 +16,6 @@ import { app } from "../lib/firebase";
 
 export default function NavBar() {
   const [user, setUser] = useState<User | null>(null);
-  const [isHovered, setIsHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const auth = getAuth(app);
 
@@ -27,16 +26,14 @@ export default function NavBar() {
 
   const handleSignIn = async () => {
     try {
-      // 🔹 Track manual sign-in attempt
-      window.gtag?.('event', 'manual_signin_clicked', {
-        event_category: 'Auth',
+      window.gtag?.("event", "manual_signin_clicked", {
+        event_category: "Auth",
       });
-  
+
       const result = await signInWithPopup(auth, new GoogleAuthProvider());
-  
-      // ✅ Track sign-in success
-      window.gtag?.('event', 'manual_signin_success', {
-        event_category: 'Auth',
+
+      window.gtag?.("event", "manual_signin_success", {
+        event_category: "Auth",
         user_email: result.user.email,
       });
     } catch (error) {
@@ -46,92 +43,87 @@ export default function NavBar() {
 
   const handleSignOut = async () => {
     try {
-      // ✅ Track sign-out
-      window.gtag?.('event', 'user_signed_out', {
-        event_category: 'Auth',
+      window.gtag?.("event", "user_signed_out", {
+        event_category: "Auth",
         user_email: auth.currentUser?.email || "(unknown)",
       });
-  
+
       await signOut(auth);
     } catch (error) {
       console.error("Sign-out error:", error);
     }
   };
 
-  const links = ["valuation", "listings", "agents", "contact"];
+  const links = ["valuation", "buy", "agents", "contact", "sell"];
+  const leftLinks = ["buy", "sell", "valuation"];
+  const rightLinks = ["agents", "contact"];
+
 
   return (
-    <nav
-      className={`bg-[#0E0E0B] text-white shadow-sm fixed top-0 w-full z-50 border-b border-gold-500 transition-all duration-500 ${
-        isHovered ? "bg-white text-black" : ""
-      }`}
-      onMouseEnter={() => {
-        if (window.innerWidth >= 768) setIsHovered(true);
-      }}
-      onMouseLeave={() => {
-        if (window.innerWidth >= 768) setIsHovered(false);
-      }}
-      
-    >
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between transition-all duration-500">
+    <nav className="bg-white text-gray-900 shadow-sm fixed top-0 w-full z-50 border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/">
-          <div className="flex items-center space-x-2">
-            <div className="relative w-12 h-12">
-              <Image
+        <Link href="/" className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-2">
+            <div className="relative w-14 h-14">
+                <Image
                 src="/logo.png"
                 alt="Top Luxury Listings Logo"
                 fill
-                className={`object-contain transition-opacity duration-900 ${
-                  isHovered ? "opacity-0" : "opacity-100"
-                }`}
-              />
-              <Image
-                src="/inverted-logo.png"
-                alt="Top Luxury Listings Logo Inverted"
-                fill
-                className={`object-contain absolute top-0 left-0 transition-opacity duration-500 ${
-                  isHovered ? "opacity-100" : "opacity-0"
-                }`}
-              />
+                className="object-contain"
+                />
             </div>
-          </div>
+            <span className="text-2xl font-bold text-gray-900 tracking-wide">Top Luxury Listings</span>
         </Link>
 
+
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center space-x-8 text-sm font-semibold">
-          {links.map((link) => (
+        <div className="hidden md:flex items-center justify-between w-full text-sm font-semibold">
+        {/* Left links */}
+        <div className="flex space-x-8">
+            {leftLinks.map((link) => (
             <Link
-              key={link}
-              href={`/${link}`}
-              className={`uppercase tracking-wide transition-colors duration-200 ${
-                isHovered ? "text-black hover:text-gold-500" : "text-white hover:text-gold-400"
-              }`}
+                key={link}
+                href={`/${link}`}
+                className="uppercase tracking-wide text-gray-800 hover:text-gold-500 transition-colors"
             >
-              {link.charAt(0).toUpperCase() + link.slice(1)}
+                {link.charAt(0).toUpperCase() + link.slice(1)}
             </Link>
-          ))}
-          {user ? (
-            <div className="flex items-center space-x-3">
-              <span className={`text-xs font-light ${isHovered ? "text-black" : "text-white"}`}>
-                {user.email}
-              </span>
-              <button
+            ))}
+        </div>
+
+        {/* Right links */}
+        <div className="flex items-center space-x-6">
+            {rightLinks.map((link) => (
+            <Link
+                key={link}
+                href={`/${link}`}
+                className="uppercase tracking-wide text-gray-800 hover:text-gold-500 transition-colors"
+            >
+                {link.charAt(0).toUpperCase() + link.slice(1)}
+            </Link>
+            ))}
+
+            {user ? (
+            <>
+                <span className="text-xs text-gray-500">{user.email}</span>
+                <button
                 onClick={handleSignOut}
                 className="bg-gold-500 text-black px-3 py-1 rounded hover:bg-gold-400 text-xs transition"
-              >
+                >
                 Sign Out
-              </button>
-            </div>
-          ) : (
+                </button>
+            </>
+            ) : (
             <button
-              onClick={handleSignIn}
-              className="bg-gold-500 text-black px-3 py-1 rounded hover:bg-gold-400 text-xs transition"
+                onClick={handleSignIn}
+                className="bg-gold-500 text-black px-3 py-1 rounded hover:bg-gold-400 text-xs transition"
             >
-              Sign In with Google
+                Sign In
             </button>
-          )}
+            )}
         </div>
+        </div>
+
 
         {/* Hamburger for mobile */}
         <button
@@ -139,7 +131,7 @@ export default function NavBar() {
           aria-label="Open menu"
           onClick={() => setMobileOpen(true)}
         >
-          <Menu className="h-7 w-7 text-white" />
+          <Menu className="h-7 w-7 text-gray-900" />
         </button>
       </div>
 
@@ -160,7 +152,7 @@ export default function NavBar() {
                   key={link}
                   href={`/${link}`}
                   onClick={() => setMobileOpen(false)}
-                  className="uppercase font-semibold tracking-wide hover:text-gold-500"
+                  className="uppercase font-semibold tracking-wide text-gray-900"
                 >
                   {link.charAt(0).toUpperCase() + link.slice(1)}
                 </Link>

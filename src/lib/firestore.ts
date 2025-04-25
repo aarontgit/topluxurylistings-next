@@ -18,6 +18,7 @@ import {
     minPrice,
     maxPrice,
     beds,
+    exactBeds,
     baths,
     orderField = "PriceNum",
     orderDirection = "asc",
@@ -27,6 +28,7 @@ import {
     minPrice?: number;
     maxPrice?: number;
     beds?: number;
+    exactBeds?: boolean;
     baths?: number;
     orderField?: string;
     orderDirection?: "asc" | "desc";
@@ -46,8 +48,10 @@ import {
     }
   
     if (beds !== undefined) {
-      constraints.push(where("BedsNum", ">=", beds));
-    }
+        constraints.push(
+          exactBeds ? where("BedsNum", "==", beds) : where("BedsNum", ">=", beds)
+        );
+      }
   
     if (baths !== undefined) {
       constraints.push(where("BathsNum", ">=", baths));
