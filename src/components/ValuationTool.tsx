@@ -3,21 +3,24 @@
 import { useState, useEffect, useRef } from "react";
 import {
   getAuth,
-  signInWithPopup,
-  GoogleAuthProvider,
   onAuthStateChanged,
   User,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { app, db } from "../lib/firebase";
+import { ensureUserDocument } from "../lib/createUserDoc";
+import AuthModal from "./AuthModal";
 
-export default function ValuationTool() { // eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function ValuationTool() {
   const [user, setUser] = useState<User | null>(null);
-  const [address, setAddress] = useState(""); // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [valuation, setValuation] = useState<any>(null); 
+  const [address, setAddress] = useState("");
+  const [valuation, setValuation] = useState<any>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingValuation, setPendingValuation] = useState<string | null>(null);
+
   const addressInputRef = useRef<HTMLInputElement>(null);
   const auth = getAuth(app);
 
@@ -25,22 +28,18 @@ export default function ValuationTool() { // eslint-disable-next-line @typescrip
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const snap = await getDoc(userRef);
-        if (!snap.exists()) {
-          await setDoc(userRef, {
-            email: firebaseUser.email,
-            tier: "free",
-            valuationCount: 0,
-          });
+        await ensureUserDocument();
+        if (pendingValuation) {
+          handleSubmitWithAddress(pendingValuation);
+          setPendingValuation(null);
         }
       }
     });
     return () => unsubscribe();
-  }, [auth]);
+  }, [auth, pendingValuation]);
 
-  useEffect(() => { // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const google = (window as any).google;  
+  useEffect(() => {
+    const google = (window as any).google;
     if (!google || !addressInputRef.current) return;
 
     const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
@@ -99,78 +98,51 @@ export default function ValuationTool() { // eslint-disable-next-line @typescrip
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
     if (!address) {
       setError("Please select a valid address from the dropdown.");
       return;
     }
-  
+    handleSubmitWithAddress(address);
+  };
+
+  const handleSubmitWithAddress = async (addr: string) => {
     const currentUser = auth.currentUser;
-  
+
     if (!currentUser) {
-      // 🔹 Track guest click
-      window.gtag?.('event', 'get_valuation_clicked_guest', {
-        event_category: 'Engagement',
-        event_label: address,
-      });
-  
-      setError("You must be signed in to get a valuation.");
-      try {
-        const result = await signInWithPopup(auth, new GoogleAuthProvider());
-        setUser(result.user); // Update state
-  
-        // ✅ Track sign-in success after guest valuation click
-        window.gtag?.('event', 'get_valuation_signin_success', {
-          event_category: 'Auth',
-          user_email: result.user.email,
-        });
-  
-        return handleSubmit(e); // Re-submit with now-signed-in user
-      } catch (popupError) {
-        console.error("❌ Popup sign-in failed:", popupError);
-        setError("Popup sign-in failed. Try allowing popups or checking browser settings.");
-        return;
-      }
-    } else {
-      // ✅ Track signed-in user click
-      window.gtag?.('event', 'get_valuation_clicked_signedin', {
-        event_category: 'Engagement',
-        event_label: address,
-        user_email: currentUser.email,
-      });
+      setPendingValuation(addr);
+      setShowAuthModal(true);
+      return;
     }
-  
+
     try {
-      const idToken = await auth.currentUser?.getIdToken();
+      const idToken = await currentUser.getIdToken();
       const incrementRes = await fetch("/api/incrementValuation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
-  
+
       const result = await incrementRes.json();
-  
+
       if (!incrementRes.ok) {
         setError(result.error || "Something went wrong.");
         return;
       }
-  
+
       setError(null);
-      fetchPropertyValuation(address);  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fetchPropertyValuation(addr);
     } catch (err: any) {
       console.error("🔴 handleSubmit error:", err);
       setError(err.message || "Authentication or usage error.");
     }
   };
-  
-  
 
   return (
     <div className="relative min-h-screen text-white">
-      {/* Background Image */}
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+
       <div className="absolute inset-0 bg-[url('/blue-tinted-hero.png')] bg-cover bg-center brightness-75 z-0"></div>
 
-      {/* Overlay Content */}
       <div
         className={`relative z-10 px-6 flex flex-col items-center ${
           !valuation ? "min-h-screen justify-center" : "pt-20"
@@ -205,10 +177,8 @@ export default function ValuationTool() { // eslint-disable-next-line @typescrip
         </div>
       </div>
 
-      {/* Valuation Result Section */}
       {valuation && (
-         <div className="bg-white text-gray-800 py-8 px-6 mt-12 z-20 relative shadow-xl rounded-xl w-full max-w-xl mx-auto">
-
+        <div className="bg-white text-gray-800 py-8 px-6 mt-12 z-20 relative shadow-xl rounded-xl w-full max-w-xl mx-auto">
           <h2 className="text-2xl font-semibold mb-4">Your Estimated Home Value</h2>
           <p>
             <strong>Estimate:</strong>{" "}

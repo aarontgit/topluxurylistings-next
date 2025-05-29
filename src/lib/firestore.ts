@@ -20,6 +20,8 @@ import {
     beds,
     exactBeds,
     baths,
+    cities,
+    county,
     orderField = "PriceNum",
     orderDirection = "asc",
     pageSize = 40,
@@ -30,6 +32,8 @@ import {
     beds?: number;
     exactBeds?: boolean;
     baths?: number;
+    cities?: string[]; // 🛠️ was city?: string -> now cities?: string[]
+    county?: string;
     orderField?: string;
     orderDirection?: "asc" | "desc";
     pageSize?: number;
@@ -56,6 +60,15 @@ import {
     if (baths !== undefined) {
       constraints.push(where("BathsNum", ">=", baths));
     }
+
+    if (cities && cities.length > 0) {
+        constraints.push(where("City", "in", cities.slice(0, 10))); 
+        // 🛠️ Firestore only allows max 10 values in 'in' query
+    }
+
+    if (county) {
+        constraints.push(where("County", "==", county));
+      }
   
     constraints.push(orderBy(orderField, orderDirection));
     if (cursor) {
