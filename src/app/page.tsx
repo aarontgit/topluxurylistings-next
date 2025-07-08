@@ -1,12 +1,43 @@
-// src/app/page.tsx
 "use client";
 
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState, useRef } from "react";
+import { getRecommendedListings } from "../lib/firestore";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function HomePage() {
+  const [recommended, setRecommended] = useState<any[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchLocationAndListings = async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        const geo = await res.json();
+        const city = geo.city;
+
+        const results = await getRecommendedListings(city);
+        const filtered = results.filter((l: any) => l.Beds);
+        setRecommended(filtered);
+      } catch (err) {
+        console.error("Location fetch error:", err);
+      }
+    };
+
+    fetchLocationAndListings();
+  }, []);
+
+  const scrollLeft = () => {
+    scrollRef.current?.scrollBy({ left: -400, behavior: "smooth" });
+  };
+
+  const scrollRight = () => {
+    scrollRef.current?.scrollBy({ left: 400, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen flex flex-col text-white">
       <NavBar />
@@ -64,6 +95,48 @@ export default function HomePage() {
             />
           </div>
         </div>
+
+        {recommended.length > 0 && (
+          <div className="max-w-6xl mx-auto mt-16">
+            <h2 className="text-2xl font-bold mb-6 text-[#0E0E0B]">See What&apos;s Trending</h2>
+            <div className="relative">
+              <button
+                onClick={scrollLeft}
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
+              >
+                <ChevronLeft className="text-black w-6 h-6" />
+              </button>
+              <div
+                ref={scrollRef}
+                className="flex gap-6 overflow-x-auto scroll-smooth no-scrollbar px-8"
+              >
+                {recommended.map((listing) => (
+                  <div
+                    key={listing.id}
+                    className="min-w-[280px] max-w-[280px] border rounded-xl p-4 shadow shrink-0"
+                  >
+                    <Image
+                      src={listing.Image}
+                      alt={listing.Address}
+                      width={400}
+                      height={300}
+                      className="rounded mb-4 object-cover"
+                    />
+                    <h3 className="text-lg font-semibold">{listing.Address}</h3>
+                    <p className="text-gray-700">{listing.Beds} beds • {listing.Baths} baths</p>
+                    <p className="text-gray-900 font-bold">{listing.Price}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={scrollRight}
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
+              >
+                <ChevronRight className="text-black w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       <Footer />

@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-import Script from "next/script";
 import GtagPageView from "../components/GtagPageview";
 import { Suspense } from "react";
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,20 +27,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Google Maps Places API */}
-        <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-          strategy="beforeInteractive"
-        />
-
         {/* Google Analytics 4 */}
-        <Script
-          strategy="afterInteractive"
+        <script
+          async
           src="https://www.googletagmanager.com/gtag/js?id=G-60DZCQBLGM"
         />
-        <Script
+        <script
           id="gtag-init"
-          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               window.dataLayer = window.dataLayer || [];

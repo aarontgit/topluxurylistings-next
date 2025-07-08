@@ -39,21 +39,29 @@ export default function ValuationTool() {
   }, [auth, pendingValuation]);
 
   useEffect(() => {
-    const google = (window as any).google;
-    if (!google || !addressInputRef.current) return;
-
-    const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-    });
-
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (place.formatted_address) {
-        setAddress(place.formatted_address);
-        setError(null);
+    if (!addressInputRef.current) return;
+  
+    const interval = setInterval(() => {
+      const google = (window as any).google;
+      if (google?.maps?.places && addressInputRef.current) {
+        const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
+          types: ["address"],
+          componentRestrictions: { country: "us" },
+        });
+  
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (place.formatted_address) {
+            setAddress(place.formatted_address);
+            setError(null);
+          }
+        });
+  
+        clearInterval(interval); // Stop checking once it's initialized
       }
-    });
+    }, 100);
+  
+    return () => clearInterval(interval); // Cleanup on unmount
   }, []);
 
   const fetchStreetView = async (addr: string) => {
