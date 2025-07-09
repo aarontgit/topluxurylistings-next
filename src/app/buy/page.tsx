@@ -21,6 +21,8 @@ import { ensureUserDocument } from "../../lib/createUserDoc";
 import type { User } from "firebase/auth";
 import GoogleMapsLoader from "../../components/GoogleMapsLoader";
 import type { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { useSearchParams } from "next/navigation";
+
 
 type Listing = {
   id: string;
@@ -70,6 +72,56 @@ export default function ListingsPage() {
   const [zipFallbackNotice, setZipFallbackNotice] = useState<string | null>(null);
   const [justSearchedFromAutocomplete, setJustSearchedFromAutocomplete] = useState(false);
 
+  const searchParams = useSearchParams();
+  const inputFromParams = searchParams.get("input");
+  
+  useEffect(() => {
+    if (inputFromParams && searchInput !== inputFromParams) {
+      setSearchInput(inputFromParams);
+    }
+  }, [inputFromParams]);
+  
+  
+
+  // 1️⃣ Set filters from params (no search yet)
+  useEffect(() => {
+    const zip = searchParams.get("zip") ?? "";
+    const city = searchParams.get("city") ?? "";
+    const county = searchParams.get("county") ?? "";
+
+    if (zip) {
+      setFilters((prev) => ({ ...prev, cities: [], county: null }));
+      setIsZip(true);
+    } else if (city) {
+      setFilters((prev) => ({ ...prev, cities: [city], county: null }));
+      setIsZip(false);
+    } else if (county) {
+      const fullCounty = county.includes("County") ? county : `${county} County`;
+      setFilters((prev) => ({ ...prev, cities: [], county: fullCounty }));
+      setIsZip(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!searchInput.trim()) return;
+  
+    const zip = searchParams.get("zip") ?? "";
+    const city = searchParams.get("city") ?? "";
+    const county = searchParams.get("county") ?? "";
+  
+    const shouldSearch = zip || city || county;
+  
+    if (!shouldSearch) return;
+  
+    const zipOverride = zip || undefined;
+    const cityOverride = city || undefined;
+    const countyOverride = county || undefined;
+  
+    handleSearchWithFilters(searchInput.trim(), cityOverride, countyOverride, zipOverride);
+  }, [filters]); // ← runs after filters are set
+  
+
+  
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
 
@@ -235,9 +287,9 @@ export default function ListingsPage() {
     county?: string,
     zip?: string
   ) => {
-
     setJustSearchedFromAutocomplete(true);
-
+    setSearchInput(input);
+  
     if (zip) {
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
       handleSearchWithFilters(input, undefined, undefined, zip, null);

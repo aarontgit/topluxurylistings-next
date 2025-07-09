@@ -7,6 +7,7 @@ export default function SearchBar({
   value,
   onChange,
   onSearch,
+  inputClassName = "",
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -16,6 +17,7 @@ export default function SearchBar({
     countyOverride?: string,
     zipOverride?: string
   ) => void;
+    inputClassName?: string;
 }) {
   const [autocomplete, setAutocomplete] =
     useState<google.maps.places.Autocomplete | null>(null);
@@ -76,7 +78,7 @@ export default function SearchBar({
         <Autocomplete onLoad={setAutocomplete} onPlaceChanged={handlePlaceChanged}>
           <input
             type="text"
-            className="flex-1 border border-gray-300 p-3 rounded"
+            className={`flex-1 border border-gray-300 p-3 rounded ${inputClassName}`}
             placeholder="Search by address, zip code, city, or county"
             value={value}
             onChange={(e) => onChange(e.target.value)}

@@ -7,28 +7,43 @@ import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
 import { getRecommendedListings } from "../lib/firestore";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import SearchBar from "../components/SearchBar";
+import { useRouter } from "next/navigation";
+import GoogleMapsLoader from "components/GoogleMapsLoader";
+
+
 
 export default function HomePage() {
   const [recommended, setRecommended] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [searchInput, setSearchInput] = useState("");
+
+
 
   useEffect(() => {
     const fetchLocationAndListings = async () => {
       try {
         const res = await fetch("https://ipapi.co/json/");
+        if (!res.ok) throw new Error("IP lookup failed");
         const geo = await res.json();
         const city = geo.city;
-
+  
         const results = await getRecommendedListings(city);
         const filtered = results.filter((l: any) => l.Beds);
         setRecommended(filtered);
       } catch (err) {
-        console.error("Location fetch error:", err);
+        //console.error("Location fetch error:", err);
+        // Optional: Load default city
+        const results = await getRecommendedListings("Denver");
+        const filtered = results.filter((l: any) => l.Beds);
+        setRecommended(filtered);
       }
     };
-
+  
     fetchLocationAndListings();
   }, []);
+  
 
   const scrollLeft = () => {
     scrollRef.current?.scrollBy({ left: -400, behavior: "smooth" });
@@ -39,6 +54,7 @@ export default function HomePage() {
   };
 
   return (
+    <GoogleMapsLoader>
     <div className="min-h-screen flex flex-col text-white">
       <NavBar />
 
@@ -55,11 +71,22 @@ export default function HomePage() {
               <h1 className="text-white text-4xl sm:text-5xl font-bold mb-6 drop-shadow-md">
                 Your next move starts here.
               </h1>
-              <input
-                type="text"
-                placeholder="Enter an address, city, county, or zip code"
-                className="w-full px-6 py-4 rounded-full text-black text-lg shadow-md focus:outline-none"
+              <SearchBar
+                value={searchInput}
+                onChange={setSearchInput}
+                onSearch={(input, cityOverride, countyOverride, zipOverride) => {
+                  const params = new URLSearchParams();
+                  params.set("input", input); // <-- ✅ full string like "518 S Williams St..."
+                    if (zipOverride) params.set("zip", zipOverride);
+                    if (cityOverride) params.set("city", cityOverride);
+                    if (countyOverride) params.set("county", countyOverride);
+                    params.set("input", input);
+                    router.push(`/buy?${params.toString()}`);
+                }}
+                inputClassName="w-[600px] max-w-full px-6 py-4 rounded-full bg-white text-black text-lg shadow-md"
               />
+
+
             </div>
           </div>
         </div>
@@ -123,5 +150,6 @@ export default function HomePage() {
       </main>
       <Footer />
     </div>
+    </GoogleMapsLoader>
   );
 }
