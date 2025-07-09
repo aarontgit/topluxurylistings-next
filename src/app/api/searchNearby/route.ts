@@ -51,6 +51,14 @@ export async function POST(req: NextRequest) {
     cursor,
   } = body;
 
+  console.log("📬 searchNearby received:", {
+    citySearch,
+    zip,
+    cityOverride,
+    county,
+  });
+  
+
   const pageSize = 40;
   let addressMatch: ListingData | null = null;
   let zipToUse: string | null = zip ?? null;
@@ -88,12 +96,12 @@ export async function POST(req: NextRequest) {
 
     let query = db.collection("public_listings").orderBy("PriceNum", "desc");
 
-    if (cityOverride) {
-      query = query.where("City", "==", cityOverride);
-    }
     if (zipToUse) {
-      query = query.where("ZipCode", "==", zipToUse);
-    }
+        query = query.where("ZipCode", "==", zipToUse);
+      } else if (cityOverride) {
+        query = query.where("City", "==", cityOverride);
+      }
+      
     if (minPrice !== undefined) {
       query = query.where("PriceNum", ">=", minPrice);
     }

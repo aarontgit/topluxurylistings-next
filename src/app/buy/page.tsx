@@ -68,6 +68,7 @@ export default function ListingsPage() {
   const [citySearch, setCitySearch] = useState(false);
   const [isZip, setIsZip] = useState(false);
   const [zipFallbackNotice, setZipFallbackNotice] = useState<string | null>(null);
+  const [justSearchedFromAutocomplete, setJustSearchedFromAutocomplete] = useState(false);
 
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
@@ -86,10 +87,15 @@ export default function ListingsPage() {
   }, []);
 
   useEffect(() => {
+    if (justSearchedFromAutocomplete) {
+      setJustSearchedFromAutocomplete(false); // ✅ reset flag
+      return; // ✅ skip this effect if autocomplete just ran
+    }
+  
     const { cities, county, minPrice, maxPrice, beds, baths } = filters;
     const trimmedInput = searchInput.trim();
     const isZip = /^\d{5}$/.test(trimmedInput);
-
+  
     const shouldSearch =
       cities.length > 0 ||
       !!county ||
@@ -98,9 +104,9 @@ export default function ListingsPage() {
       !!beds ||
       !!baths ||
       isZip;
-
+  
     if (!shouldSearch) return;
-
+  
     handleSearchWithFilters(
       trimmedInput,
       undefined,
@@ -108,6 +114,7 @@ export default function ListingsPage() {
       isZip && cities.length === 0 && !county ? trimmedInput : undefined
     );
   }, [filters, searchInput]);
+  
 
   useEffect(() => {
     handleSearchWithFilters(searchInput.trim(), undefined, filters.county ?? undefined);
@@ -147,12 +154,21 @@ export default function ListingsPage() {
   };
 
   const handleSearchWithFilters = async (
+
     input: string,
     cityOverride?: string,
     countyOverride?: string,
     zipOverride?: string,
     cursorParam: QueryDocumentSnapshot<DocumentData> | null = null,
   ) => {
+
+    console.log("🔍 handleSearchWithFilters() called with:", {
+      input,
+      zipOverride,
+      cityOverride,
+      countyOverride,
+    });
+
     const shouldSearch =
       cityOverride || countyOverride || zipOverride ||
       filters.minPrice || filters.maxPrice || filters.beds || filters.baths;
@@ -182,11 +198,18 @@ export default function ListingsPage() {
         beds: filters.beds ? parseInt(filters.beds) : undefined,
         exactBeds: filters.exactBeds,
         baths: filters.baths ? parseInt(filters.baths) : undefined,
-        cities: cityOverride ? [cityOverride] : filters.cities.length > 0 ? filters.cities : undefined,
-        county: countyOverride ?? undefined,
-        zip: isZip ? zipOverride : undefined,
+        cities: zipOverride
+          ? undefined
+          : cityOverride
+          ? [cityOverride]
+          : filters.cities.length > 0
+          ? filters.cities
+          : undefined,
+        county: zipOverride ? undefined : countyOverride ?? undefined,
+        zip: zipOverride ?? undefined,
         citySearch: input,
       });
+      
 
       if (zipFallback) {
         setZipFallbackNotice(
@@ -212,13 +235,21 @@ export default function ListingsPage() {
     county?: string,
     zip?: string
   ) => {
-    setFilters((prev) => ({
-      ...prev,
-      cities: city ? [city] : [],
-      county: county ?? null,
-    }));
-    setIsZip(!!zip);
-    handleSearchWithFilters(input, city, county, zip, null);
+
+    setJustSearchedFromAutocomplete(true);
+
+    if (zip) {
+      setFilters((prev) => ({ ...prev, cities: [], county: null }));
+      handleSearchWithFilters(input, undefined, undefined, zip, null);
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        cities: city ? [city] : [],
+        county: county ?? null,
+      }));
+      handleSearchWithFilters(input, city, county, undefined, null);
+    }
+    
   };
 
   const loadListings = async (reset = false) => {

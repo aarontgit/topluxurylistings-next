@@ -62,7 +62,26 @@ import {
       constraints.push(where("BathsNum", ">=", baths));
     }
   
+    console.log("🔍 getPublicListings called with:", {
+        minPrice,
+        maxPrice,
+        beds,
+        exactBeds,
+        baths,
+        cities,
+        county,
+        zip,
+        orderField,
+        orderDirection,
+        pageSize,
+        cursor,
+      });
+
+
     let zipFallback = null;
+
+
+      
   
     if (zip) {
       constraints.push(where("ZipCode", "==", zip));
@@ -83,6 +102,9 @@ import {
   
     let q = query(listingsRef, ...constraints);
     let snapshot = await getDocs(q);
+
+    console.log("📦 Initial Firestore snapshot returned:", snapshot.size);
+    console.log("📦 First doc ZIPCode:", snapshot.docs[0]?.data()?.ZipCode);
   
     if (snapshot.empty && zip) {
       // Load original ZIP entry from zip_geo collection
@@ -148,6 +170,9 @@ import {
   
           q = query(listingsRef, ...fallbackConstraints);
           snapshot = await getDocs(q);
+
+          console.log("📦 Fallback Firestore snapshot returned:", snapshot.size);
+          console.log("📦 Fallback ZIP used:", closest.zip);
         }
       }
     }
