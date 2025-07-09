@@ -22,6 +22,7 @@ import type { User } from "firebase/auth";
 import GoogleMapsLoader from "../../components/GoogleMapsLoader";
 import type { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 
 type Listing = {
@@ -365,6 +366,7 @@ export default function ListingsPage() {
   return (
     <>
       <NavBar />
+      <Suspense>
       <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
         <h1 className="text-3xl font-semibold mb-6">Active Listings</h1>
         <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end">
@@ -443,8 +445,11 @@ export default function ListingsPage() {
           </div>
         )}
         {authModalOpen && <AuthModal onClose={handleAuthSuccess} />}
+        
         <Footer />
       </div>
+      </Suspense>
     </>
+    
   );
 }
