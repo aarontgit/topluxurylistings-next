@@ -47,7 +47,18 @@ const formatCurrency = (val: string | number) => {
   return numeral(num).format("$0,0");
 };
 
-export default function ListingsPage() {
+
+export default function ListingsPage(){
+  return (
+    <>
+      <Suspense fallback={null}>
+        <ListingsPageInner />
+      </Suspense>
+    </>
+  );
+}
+
+function ListingsPageInner() {
   const [isClient, setIsClient] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [cursorDoc, setCursorDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -366,7 +377,6 @@ export default function ListingsPage() {
   return (
     <>
       <NavBar />
-      <Suspense>
       <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
         <h1 className="text-3xl font-semibold mb-6">Active Listings</h1>
         <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end">
@@ -448,7 +458,6 @@ export default function ListingsPage() {
         
         <Footer />
       </div>
-      </Suspense>
     </>
     
   );
