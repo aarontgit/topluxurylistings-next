@@ -376,30 +376,48 @@ function ListingsPageInner() {
 
   return (
     <>
-      <NavBar />
-      <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
-        <h1 className="text-3xl font-semibold mb-6">Active Listings</h1>
-        <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end">
-          <div className="w-full sm:w-[300px]">
-            <GoogleMapsLoader>
-              <SearchBar
-                value={searchInput}
-                onChange={setSearchInput}
-                onSearch={handleSearchFromAutocomplete}
-              />
-            </GoogleMapsLoader>
-          </div>
-          <div className="flex flex-wrap gap-4 items-end flex-1">
-            <PriceDropdown minPrice={filters.minPrice} maxPrice={filters.maxPrice} setFilters={setFilters} />
-            <BedBathDropdown filters={filters} setFilters={setFilters} />
-            <CountyCityMultiSelect
-              selectedCities={filters.cities}
-              setSelectedCities={setCities}
-              selectedCounty={filters.county}
-              setSelectedCounty={setCounty}
-            />
-          </div>
-        </div>
+ <NavBar />
+<div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
+  <h1 className="text-3xl font-semibold mb-6"></h1>
+
+  <div className="relative z-30 mb-4 flex flex-col sm:flex-row sm:flex-nowrap gap-2 items-end">
+  <div className="flex-shrink-0">
+    <GoogleMapsLoader>
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={handleSearchFromAutocomplete}
+        inputClassName="w-[500px] max-w-full px-3 py-2 rounded-md bg-white text-black text-sm border border-gray-300"
+      />
+    </GoogleMapsLoader>
+  </div>
+
+  <div className="flex flex-wrap sm:flex-nowrap gap-2 items-end flex-1">
+    <div className="relative z-30">
+      <PriceDropdown
+        minPrice={filters.minPrice}
+        maxPrice={filters.maxPrice}
+        setFilters={setFilters}
+      />
+    </div>
+
+    <div className="relative z-30">
+      <BedBathDropdown filters={filters} setFilters={setFilters} />
+    </div>
+
+    <div className="w-[250px] min-w-0 relative z-30">
+      <CountyCityMultiSelect
+        selectedCities={filters.cities}
+        setSelectedCities={setCities}
+        selectedCounty={filters.county}
+        setSelectedCounty={setCounty}
+      />
+    </div>
+  </div>
+</div>
+
+
+
 
         {zipFallbackNotice && (
           <div className="mb-6 p-4 border-l-4 border-yellow-500 bg-yellow-50 text-yellow-800 rounded">

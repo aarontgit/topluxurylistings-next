@@ -51,7 +51,7 @@ export default function PriceDropdown({ minPrice, maxPrice, setFilters }: PriceD
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="border px-4 py-2 rounded flex items-center gap-2"
+        className="border px-4 py-1.5 rounded flex items-center gap-2"
       >
         {getPriceLabel()} <ChevronDown className="w-4 h-4" />
       </button>

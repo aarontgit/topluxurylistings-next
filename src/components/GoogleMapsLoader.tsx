@@ -10,6 +10,7 @@ export default function GoogleMapsLoader({ children }: { children: React.ReactNo
     <LoadScript
       googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
       libraries={libraries}
+      version="weekly" 
     >
       {children}
     </LoadScript>

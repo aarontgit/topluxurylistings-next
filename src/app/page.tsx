@@ -83,7 +83,7 @@ export default function HomePage() {
                     params.set("input", input);
                     router.push(`/buy?${params.toString()}`);
                 }}
-                inputClassName="w-[600px] max-w-full px-6 py-4 rounded-full bg-white text-black text-lg shadow-md"
+                inputClassName="w-[600px] max-w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-black text-base shadow"
               />
 
 

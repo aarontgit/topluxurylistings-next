@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Autocomplete } from "@react-google-maps/api";
+import { useEffect } from "react";
+import Portal from "./Portal";
 
 export default function SearchBar({
   value,
@@ -23,12 +25,26 @@ export default function SearchBar({
     useState<google.maps.places.Autocomplete | null>(null);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (error) {
+      const timeout = setTimeout(() => setError(""), 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [error]);
+  
+
   const handlePlaceChanged = () => {
     if (!autocomplete) return;
   
     const place = autocomplete.getPlace();
     const formatted = place.formatted_address || place.name || "";
     const components = place.address_components || [];
+    const state = components.find(c => c.types.includes("administrative_area_level_1"))?.short_name;
+
+    if (state !== "CO") {
+        setError("Please choose a location in Colorado.");
+        return;
+    }
   
     const streetNumber = components.find((c) => c.types.includes("street_number"));
     const route = components.find((c) => c.types.includes("route"));
@@ -75,8 +91,37 @@ export default function SearchBar({
   return (
     <div className="w-full max-w-2xl mx-auto">
       <div className="flex gap-2">
-        <Autocomplete onLoad={setAutocomplete} onPlaceChanged={handlePlaceChanged}>
-          <input
+      <Autocomplete
+        onLoad={(auto) => {
+            auto.setComponentRestrictions({ country: "us" });
+
+            auto.setOptions({
+            bounds: new google.maps.LatLngBounds(
+                new google.maps.LatLng(36.9, -109.1),
+                new google.maps.LatLng(41.0, -102.0)
+            ),
+            strictBounds: true,
+            } as google.maps.places.AutocompleteOptions);
+
+            setAutocomplete(auto);
+        }}
+        onPlaceChanged={handlePlaceChanged}
+        >
+        <div className="relative w-full">
+            
+        {error && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50">
+                <div className="bg-red-500 text-white text-sm px-4 py-2 rounded shadow animate-fade">
+                {error}
+                </div>
+            </div>
+            )}
+
+
+
+            
+
+            <input
             type="text"
             className={`flex-1 border border-gray-300 p-3 rounded ${inputClassName}`}
             placeholder="Search by address, zip code, city, or county"
@@ -84,31 +129,25 @@ export default function SearchBar({
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  e.preventDefault();
-              
-                  const zipMatch = value.match(/\b\d{5}\b/);
-                  const hasStreet = /\d+ [^\d]+/.test(value); // detects addresses like "123 Main St"
-              
-                  if (hasStreet && zipMatch) {
-                    // Treat as full address, extract ZIP
+                e.preventDefault();
+                const zipMatch = value.match(/\b\d{5}\b/);
+                const hasStreet = /\d+ [^\d]+/.test(value);
+                if (hasStreet && zipMatch) {
                     onSearch(value, undefined, undefined, zipMatch[0]);
-                  } else if (zipMatch) {
-                    // ZIP only
+                } else if (zipMatch) {
                     onSearch(zipMatch[0], undefined, undefined, zipMatch[0]);
-                  } else if (value.toLowerCase().includes("county")) {
-                    // County input
+                } else if (value.toLowerCase().includes("county")) {
                     onSearch(value, undefined, value);
-                  } else {
-                    // Fallback to city
+                } else {
                     onSearch(value, value);
-                  }
                 }
-              }}
-              
-          />
+                }
+            }}
+            />
+        </div>
         </Autocomplete>
+
       </div>
-      {error && <p className="text-red-500 mt-2">{error}</p>}
     </div>
   );
 }

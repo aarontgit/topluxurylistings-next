@@ -41,7 +41,7 @@ export default function BedBathDropdown({
   return (
     <div className="relative w-60">
       <Listbox value={label} onChange={() => {}}>
-        <Listbox.Button className="border px-3 py-2 rounded w-full text-left">
+      <Listbox.Button className="border px-3 py-1.5 rounded w-full text-left">
           {label}
         </Listbox.Button>
         <Listbox.Options className="absolute z-10 mt-1 bg-white shadow rounded min-w-[20rem] p-4 space-y-4">
