@@ -1,7 +1,7 @@
 // components/GoogleMapsLoader.tsx
 "use client";
 
-import { LoadScript } from "@react-google-maps/api";
+import { GoogleMap, Marker, useJsApiLoader , LoadScript } from "@react-google-maps/api";
 
 const libraries: ("places")[] = ["places"];
 
