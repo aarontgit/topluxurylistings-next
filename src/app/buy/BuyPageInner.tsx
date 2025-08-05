@@ -27,7 +27,6 @@ import type { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-
 type Listing = {
   id: string;
   Address?: string;
@@ -49,7 +48,6 @@ const formatCurrency = (val: string | number) => {
   if (isNaN(num)) return "";
   return numeral(num).format("$0,0");
 };
-
 
 export default function ListingsPage(){
   return (
@@ -86,20 +84,17 @@ function ListingsPageInner() {
   const [isZip, setIsZip] = useState(false);
   const [zipFallbackNotice, setZipFallbackNotice] = useState<string | null>(null);
   const [justSearchedFromAutocomplete, setJustSearchedFromAutocomplete] = useState(false);
-  
+  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null); // ✅ ADDED
 
   const searchParams = useSearchParams();
   const inputFromParams = searchParams.get("input");
-  
+
   useEffect(() => {
     if (inputFromParams && searchInput !== inputFromParams) {
       setSearchInput(inputFromParams);
     }
   }, [inputFromParams]);
-  
-  
 
-  // 1️⃣ Set filters from params (no search yet)
   useEffect(() => {
     const zip = searchParams.get("zip") ?? "";
     const city = searchParams.get("city") ?? "";
@@ -120,27 +115,22 @@ function ListingsPageInner() {
 
   useEffect(() => {
     if (!searchInput.trim() || justSearchedFromAutocomplete) return;
-  
+
     const zip = searchParams.get("zip") ?? "";
     const city = searchParams.get("city") ?? "";
     const county = searchParams.get("county") ?? "";
-  
+
     const shouldSearch = zip || city || county;
-  
     if (!shouldSearch) return;
-  
+
     const zipOverride = zip || undefined;
     const cityOverride = city || undefined;
     const countyOverride = county || undefined;
-  
+
     handleSearchWithFilters(searchInput.trim(), cityOverride, countyOverride, zipOverride);
-  
     setJustSearchedFromAutocomplete(false);
   }, [filters, searchInput]);
-  // ← runs after filters are set
-  
 
-  
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
 
@@ -159,25 +149,19 @@ function ListingsPageInner() {
 
   useEffect(() => {
     if (justSearchedFromAutocomplete) {
-      setJustSearchedFromAutocomplete(false); // ✅ reset flag
-      return; // ✅ skip this effect if autocomplete just ran
+      setJustSearchedFromAutocomplete(false);
+      return;
     }
-  
+
     const { cities, county, minPrice, maxPrice, beds, baths } = filters;
     const trimmedInput = searchInput.trim();
     const isZip = /^\d{5}$/.test(trimmedInput);
-  
+
     const shouldSearch =
-      cities.length > 0 ||
-      !!county ||
-      !!minPrice ||
-      !!maxPrice ||
-      !!beds ||
-      !!baths ||
-      isZip;
-  
+      cities.length > 0 || !!county || !!minPrice || !!maxPrice || !!beds || !!baths || isZip;
+
     if (!shouldSearch) return;
-  
+
     handleSearchWithFilters(
       trimmedInput,
       undefined,
@@ -185,7 +169,6 @@ function ListingsPageInner() {
       isZip && cities.length === 0 && !county ? trimmedInput : undefined
     );
   }, [filters, searchInput]);
-  
 
   useEffect(() => {
     handleSearchWithFilters(searchInput.trim(), undefined, filters.county ?? undefined);
@@ -225,7 +208,6 @@ function ListingsPageInner() {
   };
 
   const handleSearchWithFilters = async (
-
     input: string,
     cityOverride?: string,
     countyOverride?: string,
@@ -233,76 +215,56 @@ function ListingsPageInner() {
     cursorParam: QueryDocumentSnapshot<DocumentData> | null = null,
   ) => {
     if (/^\d{5}$/.test(input) && !zipOverride) {
-        setIsZip(true);
-        setFilters((prev) => ({ ...prev, cities: [], county: null }));
-        handleSearchWithFilters(input, undefined, undefined, input);
-        return;
-      }
-      
+      setIsZip(true);
+      setFilters((prev) => ({ ...prev, cities: [], county: null }));
+      setSearchLocationLabel(`ZIP Code ${input}`); // ✅ NEW
+      handleSearchWithFilters(input, undefined, undefined, input);
+      return;
+    }
 
-    console.log("🔍 handleSearchWithFilters() called with:", {
-      input,
-      zipOverride,
-      cityOverride,
-      countyOverride,
-    });
+    setSearchLocationLabel(input); // ✅ NEW
 
     const shouldSearch =
-    cityOverride || countyOverride || zipOverride ||
-    filters.minPrice || filters.maxPrice || filters.beds || filters.baths;
-  
+      cityOverride || countyOverride || zipOverride ||
+      filters.minPrice || filters.maxPrice || filters.beds || filters.baths;
+
     if (!shouldSearch) return;
-  
 
     setCitySearch(false);
     setLoading(true);
 
     try {
+      let field: string | undefined;
+      let direction: 'asc' | 'desc' | undefined;
 
-        let field: string | undefined;
-        let direction: 'asc' | 'desc' | undefined;
-        
-        if (sortOrder) {
-          const [f, d] = sortOrder.split('_');
-          field = f;
-          direction = d as 'asc' | 'desc';
-        } else {
-          field = undefined;
-          direction = undefined;
-        }
-        
+      if (sortOrder) {
+        const [f, d] = sortOrder.split('_');
+        field = f;
+        direction = d as 'asc' | 'desc';
+      }
 
       const { listings: newListings, nextPageCursor, zipFallback } = await getPublicListings({
         pageSize: 40,
         cursor: cursorParam,
         orderField:
-          field === 'price'
-            ? 'PriceNum'
-            : field === 'sqft'
-            ? 'SqFtNum'
-            : field === 'beds'
-            ? 'BedsNum'
-            : 'PriceNum',
-        orderDirection: direction as 'asc' | 'desc',
+          field === 'price' ? 'PriceNum' :
+          field === 'sqft' ? 'SqFtNum' :
+          field === 'beds' ? 'BedsNum' :
+          'PriceNum',
+        orderDirection: direction,
         minPrice: filters.minPrice ? parseInt(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? parseInt(filters.maxPrice) : undefined,
         beds: filters.beds ? parseInt(filters.beds) : undefined,
         exactBeds: filters.exactBeds,
         baths: filters.baths ? parseInt(filters.baths) : undefined,
-        cities: zipOverride
-        ? undefined
-        : cityOverride
-        ? [cityOverride]
-        : countyOverride
-        ? undefined // don’t apply cities if county is selected
-        : filters.cities.length > 0
-        ? filters.cities
-        : undefined,      
+        cities: zipOverride ? undefined :
+                cityOverride ? [cityOverride] :
+                countyOverride ? undefined :
+                filters.cities.length > 0 ? filters.cities : undefined,
         county: zipOverride ? undefined : countyOverride ?? undefined,
         zip: zipOverride ?? undefined,
         citySearch: input,
       });
-      
 
       if (zipFallback) {
         setZipFallbackNotice(
@@ -329,47 +291,38 @@ function ListingsPageInner() {
     zip?: string
   ) => {
     setSearchInput(input);
-  
+    setSearchLocationLabel(input); // ✅ NEW
+
     if (zip) {
-        setFilters((prev) => ({ ...prev, cities: [], county: null }));
-        handleSearchWithFilters(input, undefined, undefined, zip, null);
-      } else if (county === "Denver County") {
-        // Special handling: treat Denver County as a county only, no cities
-        setFilters((prev) => ({
-          ...prev,
-          cities: [],
-          county: "Denver County",
-        }));
-        handleSearchWithFilters(input, undefined, "Denver County", undefined, null);
-      } else {
-        setFilters((prev) => ({
-          ...prev,
-          cities: city ? [city] : [],
-          county: county ?? null,
-        }));
-        handleSearchWithFilters(input, city, county, undefined, null);
-      }
-      
-  
-    setJustSearchedFromAutocomplete(true); // ✅ move this to the end
+      setFilters((prev) => ({ ...prev, cities: [], county: null }));
+      handleSearchWithFilters(input, undefined, undefined, zip, null);
+    } else if (county === "Denver County") {
+      setFilters((prev) => ({ ...prev, cities: [], county: "Denver County" }));
+      handleSearchWithFilters(input, undefined, "Denver County", undefined, null);
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        cities: city ? [city] : [],
+        county: county ?? null,
+      }));
+      handleSearchWithFilters(input, city, county, undefined, null);
+    }
+
+    setJustSearchedFromAutocomplete(true);
   };
-  
 
   const loadListings = async (reset = false) => {
     setLoading(true);
     setCitySearch(false);
+
     let field: string | undefined;
     let direction: 'asc' | 'desc' | undefined;
 
     if (sortOrder) {
-    const [f, d] = sortOrder.split('_');
-    field = f;
-    direction = d as 'asc' | 'desc';
-    } else {
-    field = undefined;
-    direction = undefined;
+      const [f, d] = sortOrder.split('_');
+      field = f;
+      direction = d as 'asc' | 'desc';
     }
-
 
     const { listings: newListings, nextPageCursor } = await getPublicListings({
       pageSize: 40,
@@ -419,29 +372,25 @@ function ListingsPageInner() {
 
   return (
     <>
- <NavBar />
-<div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
-  <h1 className="text-3xl font-semibold mb-6"></h1>
+      <NavBar />
+      <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
+        <div className="sticky top-[85px] z-40 bg-gray-50 py-3">
+          <FiltersBar
+            searchInput={searchInput}
+            setSearchInput={setSearchInput}
+            handleSearchFromAutocomplete={handleSearchFromAutocomplete}
+            filters={filters}
+            setFilters={setFilters}
+            setCities={setCities}
+            setCounty={setCounty}
+          />
+        </div>
 
-  <div className="sticky top-[85px] z-40 bg-gray-50 py-3">
-  <FiltersBar
-    searchInput={searchInput}
-    setSearchInput={setSearchInput}
-    handleSearchFromAutocomplete={handleSearchFromAutocomplete}
-    filters={filters}
-    setFilters={setFilters}
-    setCities={setCities}
-    setCounty={setCounty}
-  />
-</div>
-
-
-
-
-
-
-
-
+        {searchLocationLabel && (
+          <div className="mb-4 p-3 rounded bg-blue-50 text-blue-900 border-l-4 border-blue-500">
+            Showing listings near <strong>{searchLocationLabel}</strong>
+          </div>
+        )}
 
         {zipFallbackNotice && (
           <div className="mb-6 p-4 border-l-4 border-yellow-500 bg-yellow-50 text-yellow-800 rounded">
@@ -465,23 +414,22 @@ function ListingsPageInner() {
             <option value="beds_asc">Beds (Low to High)</option>
           </select>
         </div>
-        <div className="flex flex-col lg:flex-row gap-6">
-            {/* Listings Section */}
-            <div className="w-full lg:w-1/2">
-                <ListingsGrid
-                listings={listings}
-                hasMore={hasMore}
-                loading={loading}
-                onExpand={(id) => setExpandedId(id)}
-                onLoadMore={handleLoadMore}
-                />
-            </div>
 
-            {/* Map Section (hidden on small screens) */}
-            <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
-                <MapView listings={listings} />
-            </div>
-            </div>
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="w-full lg:w-1/2">
+            <ListingsGrid
+              listings={listings}
+              hasMore={hasMore}
+              loading={loading}
+              onExpand={(id) => setExpandedId(id)}
+              onLoadMore={handleLoadMore}
+            />
+          </div>
+
+          <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
+            <MapView listings={listings} />
+          </div>
+        </div>
 
         {expandedListing && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -495,10 +443,8 @@ function ListingsPageInner() {
           </div>
         )}
         {authModalOpen && <AuthModal onClose={handleAuthSuccess} />}
-        
         <Footer />
       </div>
     </>
-    
   );
 }
