@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   getAuth,
   onAuthStateChanged,
@@ -18,11 +18,20 @@ export default function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
   const auth = getAuth(app);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (nav) {
+      const height = nav.offsetHeight;
+      document.documentElement.style.setProperty("--navbar-height", `${height}px`);
+    }
   }, []);
 
   const handleSignOut = async () => {
@@ -43,7 +52,10 @@ export default function NavBar() {
   const rightLinks = ["agents", "contact"];
 
   return (
-    <nav className="bg-white text-gray-900 shadow-sm fixed top-0 w-full z-50 border-b border-gray-200">
+    <nav
+      ref={navRef}
+      className="bg-white text-gray-900 shadow-sm fixed top-0 w-full z-50 border-b border-gray-200"
+    >
       <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-2">
@@ -179,7 +191,6 @@ export default function NavBar() {
         </div>
       )}
 
-      {/* Auth Modal */}
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
     </nav>
   );

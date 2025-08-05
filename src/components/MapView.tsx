@@ -4,6 +4,7 @@ import { GoogleMap, OverlayView } from "@react-google-maps/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ListingCard from "./ListingCard";
 import numeral from "numeral";
+import { createPortal } from "react-dom";
 
 type Listing = {
   id: string;
@@ -27,7 +28,8 @@ export default function MapView({ listings }: { listings: Listing[] }) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cardDirection, setCardDirection] = useState<"above" | "below">("above");
-  const [cardXOffset, setCardXOffset] = useState<string>("-50%"); // ✅ New
+  const [cardXOffset, setCardXOffset] = useState<string>("-50%");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const markers = useMemo(
     () =>
@@ -61,7 +63,10 @@ export default function MapView({ listings }: { listings: Listing[] }) {
         onLoad={(map) => {
           mapRef.current = map;
         }}
-        onClick={() => setSelectedId(null)}
+        onClick={() => {
+          setSelectedId(null);
+          setIsExpanded(false);
+        }}
         options={{
           disableDefaultUI: true,
           zoomControl: true,
@@ -74,12 +79,14 @@ export default function MapView({ listings }: { listings: Listing[] }) {
             lat={marker.lat}
             lng={marker.lng}
             price={marker.price}
-            onClick={() => setSelectedId(marker.id)}
+            onClick={() => {
+              setSelectedId(marker.id);
+              setIsExpanded(false);
+            }}
           />
         ))}
 
-        {/* --- Listing Card Overlay --- */}
-        {selectedListing?.GeoPoint && (
+        {selectedListing?.GeoPoint && !isExpanded && (
           <OverlayView
             key={`card-${selectedListing.id}`}
             position={{
@@ -98,7 +105,10 @@ export default function MapView({ listings }: { listings: Listing[] }) {
                     : `translate(${cardXOffset}, 10px)`,
                 zIndex: 9999999,
               }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(true);
+              }}
             >
               <ListingCard
                 listing={selectedListing}
@@ -109,7 +119,6 @@ export default function MapView({ listings }: { listings: Listing[] }) {
           </OverlayView>
         )}
 
-        {/* --- Hidden Projection Helper --- */}
         {selectedListing?.GeoPoint && (
           <OverlayView
             key={`projection-${selectedListing.id}`}
@@ -138,14 +147,12 @@ export default function MapView({ listings }: { listings: Listing[] }) {
               const windowWidth = window.innerWidth;
 
               const cardTop = point.y + (point.y < window.innerHeight / 2 ? 10 : -cardHeight);
-
               const needsPanUp = cardTop < visibleTop + padding;
               const needsPanDown = cardTop + cardHeight > visibleBottom - padding;
 
               const direction = point.y < window.innerHeight / 2 ? "below" : "above";
               setCardDirection(direction);
 
-              // ✅ Clamp horizontally
               let xOffset = "-50%";
               if (point.x - cardWidth / 2 < 0) {
                 xOffset = "0%";
@@ -154,24 +161,11 @@ export default function MapView({ listings }: { listings: Listing[] }) {
               }
               setCardXOffset(xOffset);
 
-              // 🔍 LOGGING
-              console.log("=== OverlayView Projection Debug ===");
-              console.log("LatLng:", latLng.toString());
-              console.log("Pixel Point:", { x: point.x, y: point.y });
-              console.log("Window height:", window.innerHeight);
-              console.log("Window width:", window.innerWidth);
-              console.log("Card Top:", cardTop);
-              console.log("Direction:", direction);
-              console.log("Card X Offset:", xOffset);
-              console.log("Needs pan up:", needsPanUp);
-              console.log("Needs pan down:", needsPanDown);
-
               if (needsPanUp || needsPanDown) {
                 const deltaY = needsPanUp ? -cardHeight / 2 : cardHeight / 2;
                 const adjustedPoint = new google.maps.Point(point.x, point.y + deltaY);
                 const newCenter = projection.fromContainerPixelToLatLng(adjustedPoint);
                 if (newCenter) {
-                  console.log("Panning map to:", newCenter.toString());
                   mapRef.current.panTo(newCenter);
                 }
               }
@@ -181,6 +175,31 @@ export default function MapView({ listings }: { listings: Listing[] }) {
           </OverlayView>
         )}
       </GoogleMap>
+
+      {isExpanded && selectedListing && createPortal(
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[99999] flex items-center justify-center"
+          onClick={() => {
+            setSelectedId(null);
+            setIsExpanded(false);
+          }}
+        >
+          <div
+            className="bg-white w-full max-w-3xl rounded-lg shadow-lg overflow-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ListingCard
+              listing={selectedListing}
+              isExpanded={true}
+              onClose={() => {
+                setSelectedId(null);
+                setIsExpanded(false);
+              }}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

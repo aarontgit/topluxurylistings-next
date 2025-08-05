@@ -67,7 +67,7 @@ function ListingsPageInner() {
   const [cursorDoc, setCursorDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [sortOrder, setSortOrder] = useState<string>("price_desc");
+  const [sortOrder, setSortOrder] = useState<string>("");
   const [filters, setFilters] = useState({
     minPrice: '500000',
     maxPrice: '750000',
@@ -232,6 +232,13 @@ function ListingsPageInner() {
     zipOverride?: string,
     cursorParam: QueryDocumentSnapshot<DocumentData> | null = null,
   ) => {
+    if (/^\d{5}$/.test(input) && !zipOverride) {
+        setIsZip(true);
+        setFilters((prev) => ({ ...prev, cities: [], county: null }));
+        handleSearchWithFilters(input, undefined, undefined, input);
+        return;
+      }
+      
 
     console.log("🔍 handleSearchWithFilters() called with:", {
       input,
@@ -241,16 +248,29 @@ function ListingsPageInner() {
     });
 
     const shouldSearch =
-      cityOverride || countyOverride || zipOverride ||
-      filters.minPrice || filters.maxPrice || filters.beds || filters.baths;
-
+    cityOverride || countyOverride || zipOverride ||
+    filters.minPrice || filters.maxPrice || filters.beds || filters.baths;
+  
     if (!shouldSearch) return;
+  
 
     setCitySearch(false);
     setLoading(true);
 
     try {
-      const [field, direction] = sortOrder.split('_');
+
+        let field: string | undefined;
+        let direction: 'asc' | 'desc' | undefined;
+        
+        if (sortOrder) {
+          const [f, d] = sortOrder.split('_');
+          field = f;
+          direction = d as 'asc' | 'desc';
+        } else {
+          field = undefined;
+          direction = undefined;
+        }
+        
 
       const { listings: newListings, nextPageCursor, zipFallback } = await getPublicListings({
         pageSize: 40,
@@ -270,12 +290,14 @@ function ListingsPageInner() {
         exactBeds: filters.exactBeds,
         baths: filters.baths ? parseInt(filters.baths) : undefined,
         cities: zipOverride
-          ? undefined
-          : cityOverride
-          ? [cityOverride]
-          : filters.cities.length > 0
-          ? filters.cities
-          : undefined,
+        ? undefined
+        : cityOverride
+        ? [cityOverride]
+        : countyOverride
+        ? undefined // don’t apply cities if county is selected
+        : filters.cities.length > 0
+        ? filters.cities
+        : undefined,      
         county: zipOverride ? undefined : countyOverride ?? undefined,
         zip: zipOverride ?? undefined,
         citySearch: input,
@@ -309,16 +331,25 @@ function ListingsPageInner() {
     setSearchInput(input);
   
     if (zip) {
-      setFilters((prev) => ({ ...prev, cities: [], county: null }));
-      handleSearchWithFilters(input, undefined, undefined, zip, null);
-    } else {
-      setFilters((prev) => ({
-        ...prev,
-        cities: city ? [city] : [],
-        county: county ?? null,
-      }));
-      handleSearchWithFilters(input, city, county, undefined, null);
-    }
+        setFilters((prev) => ({ ...prev, cities: [], county: null }));
+        handleSearchWithFilters(input, undefined, undefined, zip, null);
+      } else if (county === "Denver County") {
+        // Special handling: treat Denver County as a county only, no cities
+        setFilters((prev) => ({
+          ...prev,
+          cities: [],
+          county: "Denver County",
+        }));
+        handleSearchWithFilters(input, undefined, "Denver County", undefined, null);
+      } else {
+        setFilters((prev) => ({
+          ...prev,
+          cities: city ? [city] : [],
+          county: county ?? null,
+        }));
+        handleSearchWithFilters(input, city, county, undefined, null);
+      }
+      
   
     setJustSearchedFromAutocomplete(true); // ✅ move this to the end
   };
@@ -327,20 +358,24 @@ function ListingsPageInner() {
   const loadListings = async (reset = false) => {
     setLoading(true);
     setCitySearch(false);
-    const [field, direction] = sortOrder.split('_');
+    let field: string | undefined;
+    let direction: 'asc' | 'desc' | undefined;
+
+    if (sortOrder) {
+    const [f, d] = sortOrder.split('_');
+    field = f;
+    direction = d as 'asc' | 'desc';
+    } else {
+    field = undefined;
+    direction = undefined;
+    }
+
 
     const { listings: newListings, nextPageCursor } = await getPublicListings({
       pageSize: 40,
       cursor: reset ? null : cursorDoc,
-      orderField:
-        field === 'price'
-          ? 'PriceNum'
-          : field === 'sqft'
-          ? 'SqFtNum'
-          : field === 'beds'
-          ? 'BedsNum'
-          : 'PriceNum',
-      orderDirection: direction as 'asc' | 'desc',
+      orderField: field,
+      orderDirection: direction,
       minPrice: filters.minPrice ? parseInt(filters.minPrice) : undefined,
       maxPrice: filters.maxPrice ? parseInt(filters.maxPrice) : undefined,
       beds: filters.beds ? parseInt(filters.beds) : undefined,
@@ -388,7 +423,8 @@ function ListingsPageInner() {
 <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
   <h1 className="text-3xl font-semibold mb-6"></h1>
 
-    <FiltersBar
+  <div className="sticky top-[85px] z-40 bg-gray-50 py-3">
+  <FiltersBar
     searchInput={searchInput}
     setSearchInput={setSearchInput}
     handleSearchFromAutocomplete={handleSearchFromAutocomplete}
@@ -396,7 +432,12 @@ function ListingsPageInner() {
     setFilters={setFilters}
     setCities={setCities}
     setCounty={setCounty}
-    />
+  />
+</div>
+
+
+
+
 
 
 
@@ -415,6 +456,7 @@ function ListingsPageInner() {
             onChange={(e) => setSortOrder(e.target.value)}
             className="border rounded px-3 py-2 text-sm"
           >
+            <option value="">(Default)</option>
             <option value="price_desc">Price (High to Low)</option>
             <option value="price_asc">Price (Low to High)</option>
             <option value="sqft_desc">SqFt (High to Low)</option>

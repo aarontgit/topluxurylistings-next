@@ -41,7 +41,7 @@ export default function SearchBar({
     const components = place.address_components || [];
     const state = components.find(c => c.types.includes("administrative_area_level_1"))?.short_name;
 
-    if (state !== "CO") {
+    if (state && state !== "CO") {
         setError("Please choose a location in Colorado.");
         return;
     }
@@ -71,20 +71,28 @@ export default function SearchBar({
     });
   
     onChange(formatted);
-  
-    if (isFullAddress) {
+
+    // ✅ Hardcoded fix: if user selects "Denver County" from dropdown
+    if (formatted.includes("Denver County")) {
+      onSearch("Denver County", undefined, "Denver County");
+    } else if (isFullAddress) {
       onSearch(formatted, city, county, zipGuess);
     } else if (zipGuess) {
-        // Treat ZIP as primary filter, no city/county
-        onSearch(zipGuess, undefined, undefined, zipGuess);      
+      onSearch(zipGuess, undefined, undefined, zipGuess);
     } else if (city) {
       onSearch(city, city);
     } else if (county) {
       const fullCounty = county.includes("County") ? county : `${county} County`;
-      onSearch(fullCounty, undefined, fullCounty);
+    
+      if (city && city === county) {
+        onSearch(fullCounty, undefined, fullCounty);
+      } else {
+        onSearch(city || fullCounty, city || undefined, fullCounty);
+      }
     } else {
       onSearch(formatted);
     }
+    
   };
   
 

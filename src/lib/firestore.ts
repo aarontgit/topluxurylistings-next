@@ -16,6 +16,13 @@ import {
   
   const db = getFirestore(app);
   
+  function shuffleArray<T>(array: T[]): T[] {
+    return array
+      .map((value) => ({ value, sort: Math.random() }))
+      .sort((a, b) => a.sort - b.sort)
+      .map(({ value }) => value);
+  }
+  
   export async function getPublicListings({
     minPrice,
     maxPrice,
@@ -25,8 +32,8 @@ import {
     cities,
     county,
     zip,
-    orderField = "PriceNum",
-    orderDirection = "asc",
+    orderField,
+    orderDirection,
     pageSize = 40,
     cursor = null,
   }: {
@@ -38,7 +45,7 @@ import {
     cities?: string[];
     county?: string;
     zip?: string;
-    citySearch?: string; 
+    citySearch?: string;
     orderField?: string;
     orderDirection?: "asc" | "desc";
     pageSize?: number;
@@ -63,25 +70,21 @@ import {
     }
   
     console.log("🔍 getPublicListings called with:", {
-        minPrice,
-        maxPrice,
-        beds,
-        exactBeds,
-        baths,
-        cities,
-        county,
-        zip,
-        orderField,
-        orderDirection,
-        pageSize,
-        cursor,
-      });
-
-
+      minPrice,
+      maxPrice,
+      beds,
+      exactBeds,
+      baths,
+      cities,
+      county,
+      zip,
+      orderField,
+      orderDirection,
+      pageSize,
+      cursor,
+    });
+  
     let zipFallback = null;
-
-
-      
   
     if (zip) {
       constraints.push(where("ZipCode", "==", zip));
@@ -94,20 +97,25 @@ import {
       }
     }
   
-    constraints.push(orderBy(orderField, orderDirection));
+    const shouldOrder = !!orderField && !!orderDirection;
+    if (shouldOrder) {
+      constraints.push(orderBy(orderField, orderDirection));
+    }
+  
     if (cursor) {
       constraints.push(startAfter(cursor));
     }
-    constraints.push(limit(pageSize));
+  
+    const fetchSize = shouldOrder ? pageSize : 120;
+    constraints.push(limit(fetchSize));
   
     let q = query(listingsRef, ...constraints);
     let snapshot = await getDocs(q);
-
+  
     console.log("📦 Initial Firestore snapshot returned:", snapshot.size);
     console.log("📦 First doc ZIPCode:", snapshot.docs[0]?.data()?.ZipCode);
   
     if (snapshot.empty && zip) {
-      // Load original ZIP entry from zip_geo collection
       const zipRef = doc(db, "zip_geo", zip);
       const zipSnap = await getDoc(zipRef);
       const originalEntry = zipSnap.exists() ? zipSnap.data() : null;
@@ -116,7 +124,6 @@ import {
         const originalLat = originalEntry.lat;
         const originalLng = originalEntry.lng;
   
-        // Get all ZIPs
         const allZipsSnap = await getDocs(collection(db, "zip_geo"));
         const allZips = allZipsSnap.docs.map((d) => d.data());
   
@@ -143,7 +150,6 @@ import {
             fallbackCounty: closest.county_names_all,
           };
   
-          // Retry query with fallback ZIP
           const fallbackConstraints: any[] = [];
   
           if (minPrice !== undefined) {
@@ -162,26 +168,34 @@ import {
           }
   
           fallbackConstraints.push(where("ZipCode", "==", closest.zip.toString()));
-          fallbackConstraints.push(orderBy(orderField, orderDirection));
+          if (shouldOrder) {
+            fallbackConstraints.push(orderBy(orderField, orderDirection));
+          }
           if (cursor) {
             fallbackConstraints.push(startAfter(cursor));
           }
-          fallbackConstraints.push(limit(pageSize));
+          fallbackConstraints.push(limit(fetchSize));
   
           q = query(listingsRef, ...fallbackConstraints);
           snapshot = await getDocs(q);
-
+  
           console.log("📦 Fallback Firestore snapshot returned:", snapshot.size);
           console.log("📦 Fallback ZIP used:", closest.zip);
         }
       }
     }
   
+    let listings = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  
+    if (!shouldOrder) {
+      listings = shuffleArray(listings).slice(0, pageSize);
+    }
+  
     return {
-      listings: snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })),
+      listings,
       nextPageCursor: snapshot.docs[snapshot.docs.length - 1] || null,
       zipFallback,
     };
