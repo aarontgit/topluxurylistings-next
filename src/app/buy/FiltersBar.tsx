@@ -6,8 +6,6 @@ import PriceDropdown from "../../components/PriceDropdown";
 import BedBathDropdown from "../../components/BedBathDropdown";
 import CountyCityMultiSelect from "../../components/CountyCityMultiSelect";
 
-
-
 type Filters = {
   minPrice: string;
   maxPrice: string;
@@ -44,13 +42,14 @@ export default function FiltersBar({
 }) {
   return (
     <div className="relative z-30 mb-4 flex flex-col sm:flex-row sm:flex-nowrap gap-2 items-end">
-      <div className="flex-shrink-0">
-          <SearchBar
-            value={searchInput}
-            onChange={setSearchInput}
-            onSearch={handleSearchFromAutocomplete}
-            inputClassName="w-[500px] max-w-full px-3 py-2 rounded-md bg-white text-black text-sm border border-gray-300"
-          />
+      {/* Hide SearchBar on mobile */}
+      <div className="w-full lg:w-[500px] flex-shrink-0">
+        <SearchBar
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearchFromAutocomplete}
+          inputClassName="w-[500px] max-w-full px-3 py-2 rounded-md bg-white text-black text-sm border border-gray-300"
+        />
       </div>
 
       <div className="flex flex-wrap sm:flex-nowrap gap-2 items-end flex-1">

@@ -97,64 +97,61 @@ export default function SearchBar({
   
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full lg:max-w-2xl">
       <div className="flex gap-2">
-      <Autocomplete
-        onLoad={(auto) => {
-            auto.setComponentRestrictions({ country: "us" });
+        <div className="flex-1 min-w-0">
+          <Autocomplete
+            onLoad={(auto) => {
+              auto.setComponentRestrictions({ country: "us" });
 
-            auto.setOptions({
-            bounds: new google.maps.LatLngBounds(
-                new google.maps.LatLng(36.9, -109.1),
-                new google.maps.LatLng(41.0, -102.0)
-            ),
-            strictBounds: true,
-            } as google.maps.places.AutocompleteOptions);
+              auto.setOptions({
+                bounds: new google.maps.LatLngBounds(
+                  new google.maps.LatLng(36.9, -109.1),
+                  new google.maps.LatLng(41.0, -102.0)
+                ),
+                strictBounds: true,
+              } as google.maps.places.AutocompleteOptions);
 
-            setAutocomplete(auto);
-        }}
-        onPlaceChanged={handlePlaceChanged}
-        >
-        <div className="relative w-full">
-            
-        {error && (
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50">
-                <div className="bg-red-500 text-white text-sm px-4 py-2 rounded shadow animate-fade">
-                {error}
-                </div>
-            </div>
-            )}
-
-
-
-            
-
-            <input
-            type="text"
-            className={`flex-1 border border-gray-300 p-3 rounded ${inputClassName}`}
-            placeholder="Search by address, zip code, city, or county"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                e.preventDefault();
-                const zipMatch = value.match(/\b\d{5}\b/);
-                const hasStreet = /\d+ [^\d]+/.test(value);
-                if (hasStreet && zipMatch) {
-                    onSearch(value, undefined, undefined, zipMatch[0]);
-                } else if (zipMatch) {
-                    onSearch(zipMatch[0], undefined, undefined, zipMatch[0]);
-                } else if (value.toLowerCase().includes("county")) {
-                    onSearch(value, undefined, value);
-                } else {
-                    onSearch(value, value);
-                }
-                }
+              setAutocomplete(auto);
             }}
-            />
-        </div>
-        </Autocomplete>
+            onPlaceChanged={handlePlaceChanged}
+          >
+            <div className="relative w-full">
+              
+              {error && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50">
+                  <div className="bg-red-500 text-white text-sm px-4 py-2 rounded shadow animate-fade">
+                    {error}
+                  </div>
+                </div>
+              )}
 
+              <input
+                type="text"
+                className={`w-full border border-gray-300 p-3 rounded ${inputClassName}`}
+                placeholder="Search by address, zip code, city, or county"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const zipMatch = value.match(/\b\d{5}\b/);
+                    const hasStreet = /\d+ [^\d]+/.test(value);
+                    if (hasStreet && zipMatch) {
+                      onSearch(value, undefined, undefined, zipMatch[0]);
+                    } else if (zipMatch) {
+                      onSearch(zipMatch[0], undefined, undefined, zipMatch[0]);
+                    } else if (value.toLowerCase().includes("county")) {
+                      onSearch(value, undefined, value);
+                    } else {
+                      onSearch(value, value);
+                    }
+                  }
+                }}
+              />
+            </div>
+          </Autocomplete>
+        </div>
       </div>
     </div>
   );

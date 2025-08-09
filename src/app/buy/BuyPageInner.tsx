@@ -84,7 +84,22 @@ function ListingsPageInner() {
   const [isZip, setIsZip] = useState(false);
   const [zipFallbackNotice, setZipFallbackNotice] = useState<string | null>(null);
   const [justSearchedFromAutocomplete, setJustSearchedFromAutocomplete] = useState(false);
-  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null); // ✅ ADDED
+  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null); // ✅ existing
+
+  // ✅ NEW: runtime media query to know if desktop (lg: 1024px)
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) =>
+      setIsDesktop(("matches" in e ? e.matches : (e as MediaQueryList).matches));
+    onChange(mq);
+    mq.addEventListener?.("change", onChange as (e: MediaQueryListEvent) => void);
+    return () => mq.removeEventListener?.("change", onChange as (e: MediaQueryListEvent) => void);
+  }, []);
+
+  // ✅ Mobile filters toggle state (moved up to keep hook order stable)
+  const [showFilters, setShowFilters] = useState(false);
 
   const searchParams = useSearchParams();
   const inputFromParams = searchParams.get("input");
@@ -217,40 +232,39 @@ function ListingsPageInner() {
     if (/^\d{5}$/.test(input) && !zipOverride) {
       setIsZip(true);
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
-      setSearchLocationLabel(`ZIP Code ${input}`); // ✅ NEW
+      setSearchLocationLabel(`ZIP Code ${input}`);
       handleSearchWithFilters(input, undefined, undefined, input);
       return;
     }
-
-    setSearchLocationLabel(input); // ✅ NEW
-
+  
+    setSearchLocationLabel(input);
+  
     const shouldSearch =
       cityOverride || countyOverride || zipOverride ||
       filters.minPrice || filters.maxPrice || filters.beds || filters.baths;
-
+  
     if (!shouldSearch) return;
-
+  
     setCitySearch(false);
     setLoading(true);
-
+  
     try {
       let field: string | undefined;
       let direction: 'asc' | 'desc' | undefined;
-
+  
       if (sortOrder) {
         const [f, d] = sortOrder.split('_');
         field = f;
         direction = d as 'asc' | 'desc';
+      } else {
+        field = "RandomRank"; // default randomized order
+        direction = "asc";
       }
-
+  
       const { listings: newListings, nextPageCursor, zipFallback } = await getPublicListings({
-        pageSize: 40,
+        pageSize: isDesktop ? 40 : 20, // ✅ fewer on mobile
         cursor: cursorParam,
-        orderField:
-          field === 'price' ? 'PriceNum' :
-          field === 'sqft' ? 'SqFtNum' :
-          field === 'beds' ? 'BedsNum' :
-          'PriceNum',
+        orderField: field,
         orderDirection: direction,
         minPrice: filters.minPrice ? parseInt(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? parseInt(filters.maxPrice) : undefined,
@@ -265,7 +279,7 @@ function ListingsPageInner() {
         zip: zipOverride ?? undefined,
         citySearch: input,
       });
-
+  
       if (zipFallback) {
         setZipFallbackNotice(
           `No listings found in ${zipFallback.originalZip}. Showing results near ${zipFallback.fallbackZip} (${zipFallback.fallbackCity}, ${zipFallback.fallbackCounty}).`
@@ -273,7 +287,7 @@ function ListingsPageInner() {
       } else {
         setZipFallbackNotice(null);
       }
-
+  
       setListings(cursorParam ? (prev) => [...prev, ...newListings] : newListings);
       setCursorDoc(nextPageCursor ?? null);
       setHasMore(!!nextPageCursor);
@@ -291,7 +305,7 @@ function ListingsPageInner() {
     zip?: string
   ) => {
     setSearchInput(input);
-    setSearchLocationLabel(input); // ✅ NEW
+    setSearchLocationLabel(input);
 
     if (zip) {
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
@@ -314,18 +328,21 @@ function ListingsPageInner() {
   const loadListings = async (reset = false) => {
     setLoading(true);
     setCitySearch(false);
-
+  
     let field: string | undefined;
     let direction: 'asc' | 'desc' | undefined;
-
+  
     if (sortOrder) {
       const [f, d] = sortOrder.split('_');
       field = f;
       direction = d as 'asc' | 'desc';
+    } else {
+      field = "RandomRank"; // default randomized order
+      direction = "asc";
     }
-
+  
     const { listings: newListings, nextPageCursor } = await getPublicListings({
-      pageSize: 40,
+      pageSize: isDesktop ? 40 : 20, // ✅ fewer on mobile
       cursor: reset ? null : cursorDoc,
       orderField: field,
       orderDirection: direction,
@@ -337,12 +354,13 @@ function ListingsPageInner() {
       cities: filters.cities.length > 0 ? filters.cities : undefined,
       county: filters.county ?? undefined,
     });
-
+  
     setListings(prev => reset ? newListings : [...prev, ...newListings]);
     setCursorDoc(nextPageCursor ?? null);
     setHasMore(!!nextPageCursor);
     setLoading(false);
   };
+  
 
   const handleLoadMore = () => {
     handleSearchWithFilters(searchInput, undefined, filters.county ?? undefined, undefined, cursorDoc);
@@ -374,7 +392,35 @@ function ListingsPageInner() {
     <>
       <NavBar />
       <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
-        <div className="sticky top-[85px] z-40 bg-gray-50 py-3">
+
+        {/* ✅ Mobile-only sticky SearchBar (centered & full width) */}
+        <div className="lg:hidden sticky top-[70px] z-50 bg-gray-50 py-3">
+          <div className="w-full px-0">
+            <SearchBar
+              value={searchInput}
+              onChange={setSearchInput}
+              onSearch={handleSearchFromAutocomplete}
+              // Make the input fill its container on mobile
+              inputClassName="w-full px-3 py-2 rounded-md bg-white text-black text-sm border border-gray-300"
+            />
+          </div>
+        </div>
+
+        {/* ✅ Mobile Filters toggle */}
+        <div className="lg:hidden mb-3">
+          <button
+            onClick={() => setShowFilters(prev => !prev)}
+            aria-expanded={showFilters}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+        </div>
+
+        {/* ✅ FiltersBar: mobile = toggle, desktop = always visible */}
+        <div
+          className={`bg-gray-50 py-3 ${showFilters ? "block" : "hidden"} lg:block sticky lg:top-[85px] z-40`}
+        >
           <FiltersBar
             searchInput={searchInput}
             setSearchInput={setSearchInput}
@@ -406,12 +452,10 @@ function ListingsPageInner() {
             className="border rounded px-3 py-2 text-sm"
           >
             <option value="">(Default)</option>
-            <option value="price_desc">Price (High to Low)</option>
-            <option value="price_asc">Price (Low to High)</option>
-            <option value="sqft_desc">SqFt (High to Low)</option>
-            <option value="sqft_asc">SqFt (Low to High)</option>
-            <option value="beds_desc">Beds (High to Low)</option>
-            <option value="beds_asc">Beds (Low to High)</option>
+            <option value="PriceNum_desc">Price (High to Low)</option>
+            <option value="PriceNum_asc">Price (Low to High)</option>
+            {/*<option value="SqFtNum_desc">SqFt (High to Low)</option>*/}
+            {/*<option value="SqFtNum_asc">SqFt (Low to High)</option>*/}
           </select>
         </div>
 
@@ -426,9 +470,12 @@ function ListingsPageInner() {
             />
           </div>
 
-          <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
-            <MapView listings={listings} />
-          </div>
+          {/* ✅ Only mount Map on desktop */}
+          {isDesktop && (
+            <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
+              <MapView listings={listings} />
+            </div>
+          )}
         </div>
 
         {expandedListing && (
