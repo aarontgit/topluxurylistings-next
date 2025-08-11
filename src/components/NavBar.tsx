@@ -57,17 +57,29 @@ export default function NavBar() {
       className="bg-white text-gray-900 shadow-sm fixed top-0 w-full z-50 border-b border-gray-200"
     >
       <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-2">
-          <div className="relative w-14 h-14">
-            <Image
-              src="/logo.png"
-              alt="Top Luxury Listings Logo"
-              fill
-              className="object-contain"
-            />
+        {/* Center logo + text for desktop, text only for mobile */}
+        <Link
+          href="/"
+          className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-2"
+        >
+          {/* Desktop view (logo + text) */}
+          <div className="hidden md:flex items-center space-x-2">
+            <div className="relative w-14 h-14">
+              <Image
+                src="/logo.png"
+                alt="Top Luxury Listings Logo"
+                fill
+                className="object-contain"
+              />
+            </div>
+            <span className="text-2xl font-bold text-gray-900 tracking-wide">
+              Top Luxury Listings
+            </span>
           </div>
-          <span className="text-2xl font-bold text-gray-900 tracking-wide">Top Luxury Listings</span>
+          {/* Mobile view (text only, no wrapping) */}
+          <span className="md:hidden text-2xl font-bold text-gray-900 tracking-wide whitespace-nowrap">
+            Top Luxury Listings
+          </span>
         </Link>
 
         {/* Desktop nav */}

@@ -189,6 +189,14 @@ function ListingsPageInner() {
     handleSearchWithFilters(searchInput.trim(), undefined, filters.county ?? undefined);
   }, [sortOrder]);
 
+  // Prevent background scroll when mobile filters modal is open
+  useEffect(() => {
+    if (!showFilters) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [showFilters]);
+
   const handleInquire = async (listing: Listing) => {
     if (!auth.currentUser) {
       setPendingInquireListing(listing);
@@ -394,7 +402,7 @@ function ListingsPageInner() {
       <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
 
         {/* ✅ Mobile-only sticky SearchBar (centered & full width) */}
-        <div className="lg:hidden sticky top-[70px] z-50 bg-gray-50 py-3">
+        <div className="lg:hidden sticky top-[70px] z-20 bg-gray-50 py-3">
           <div className="w-full px-0">
             <SearchBar
               value={searchInput}
@@ -417,10 +425,8 @@ function ListingsPageInner() {
           </button>
         </div>
 
-        {/* ✅ FiltersBar: mobile = toggle, desktop = always visible */}
-        <div
-          className={`bg-gray-50 py-3 ${showFilters ? "block" : "hidden"} lg:block sticky lg:top-[85px] z-40`}
-        >
+        {/* ✅ Desktop filters: sticky & always visible */}
+        <div className="hidden lg:block sticky top-[85px] z-40 bg-gray-50 py-3">
           <FiltersBar
             searchInput={searchInput}
             setSearchInput={setSearchInput}
@@ -431,6 +437,48 @@ function ListingsPageInner() {
             setCounty={setCounty}
           />
         </div>
+
+        {/* ✅ Mobile filters as a TOP modal (over everything) */}
+        {showFilters && (
+          <div className="lg:hidden fixed inset-0 z-[100]">
+            {/* overlay */}
+            <div
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setShowFilters(false)}
+              aria-hidden="true"
+            />
+            {/* sheet at the TOP */}
+            <div className="absolute top-0 left-0 right-0 max-h-[90vh] bg-white rounded-b-2xl shadow-2xl p-4 overflow-visible">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold">Filters</h3>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="text-sm px-3 py-1 border rounded"
+                  aria-label="Close filters"
+                >
+                  Close
+                </button>
+              </div>
+
+              <FiltersBar
+                searchInput={searchInput}
+                setSearchInput={setSearchInput}
+                handleSearchFromAutocomplete={handleSearchFromAutocomplete}
+                filters={filters}
+                setFilters={setFilters}
+                setCities={setCities}
+                setCounty={setCounty}
+              />
+
+              <button
+                onClick={() => setShowFilters(false)}
+                className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
 
         {searchLocationLabel && (
           <div className="mb-4 p-3 rounded bg-blue-50 text-blue-900 border-l-4 border-blue-500">
@@ -470,7 +518,7 @@ function ListingsPageInner() {
             />
           </div>
 
-          {/* ✅ Only mount Map on desktop */}
+        {/* ✅ Only mount Map on desktop */}
           {isDesktop && (
             <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
               <MapView listings={listings} />
@@ -486,6 +534,7 @@ function ListingsPageInner() {
               isExpanded={true}
               onClose={closeExpanded}
               onInquire={handleInquire}
+              useMobileCarousel={!isDesktop} // ✅ only necessary change
             />
           </div>
         )}

@@ -10,7 +10,6 @@ interface CountyCityMultiSelectProps {
   setSelectedCities: React.Dispatch<React.SetStateAction<string[]>>;
   selectedCounty: string | null;
   setSelectedCounty: React.Dispatch<React.SetStateAction<string | null>>;
-  
 }
 
 // Type guard since imported JSON has no types
@@ -25,9 +24,6 @@ const allCities = Array.from(
   )
 ).sort();
 
-
-
-
 export default function CountyCityMultiSelect({
   selectedCities,
   setSelectedCities,
@@ -38,20 +34,21 @@ export default function CountyCityMultiSelect({
   const [citySearch, setCitySearch] = useState('');
 
   useEffect(() => {
-    const allRelevantCities = selectedCounty && typedCountyCityMap[selectedCounty]
-      ? typedCountyCityMap[selectedCounty]
-      : allCities;
-  
+    const allRelevantCities =
+      selectedCounty && typedCountyCityMap[selectedCounty]
+        ? typedCountyCityMap[selectedCounty]
+        : allCities;
+
     const filtered = allRelevantCities
       .filter(city => city.toLowerCase().includes(citySearch.toLowerCase()))
       .sort((a, b) => a.localeCompare(b));
-  
+
     setFilteredCities(filtered);
   }, [selectedCounty, citySearch]);
 
   const toggleCity = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city]
+    setSelectedCities(prev =>
+      prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
     );
   };
 
@@ -60,14 +57,14 @@ export default function CountyCityMultiSelect({
       ? selectedCities.join(', ')
       : 'Any City'
   }`;
-  
 
   return (
     <Popover className="relative w-full max-w-md">
-    <Popover.Button className="border px-3 py-1.5 rounded w-full text-left relative">
-      <span className="block truncate">{label}</span>
-      <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-    </Popover.Button>
+      {/* CHANGED: add pr-9 and pin chevron to right-3 with consistent size */}
+      <Popover.Button className="border px-3 pr-9 py-1.5 rounded w-full text-left relative bg-white">
+        <span className="block truncate">{label}</span>
+        <ChevronDownIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </Popover.Button>
 
       <Popover.Panel className="absolute z-10 mt-2 w-full bg-white border rounded shadow-lg p-4 text-sm space-y-4">
         {/* County Dropdown */}

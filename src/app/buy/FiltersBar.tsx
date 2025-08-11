@@ -43,7 +43,7 @@ export default function FiltersBar({
   return (
     <div className="relative z-30 mb-4 flex flex-col sm:flex-row sm:flex-nowrap gap-2 items-end">
       {/* Hide SearchBar on mobile */}
-      <div className="w-full lg:w-[500px] flex-shrink-0">
+      <div className="hidden lg:block w-full lg:w-[500px] flex-shrink-0">
         <SearchBar
           value={searchInput}
           onChange={setSearchInput}
@@ -52,8 +52,9 @@ export default function FiltersBar({
         />
       </div>
 
-      <div className="flex flex-wrap sm:flex-nowrap gap-2 items-end flex-1">
-        <div className="relative z-30">
+      {/* CHANGED: stack on mobile with equal widths */}
+      <div className="flex flex-col sm:flex-row sm:flex-nowrap gap-2 items-stretch flex-1 w-full">
+        <div className="relative z-30 w-full sm:w-auto">
           <PriceDropdown
             minPrice={filters.minPrice}
             maxPrice={filters.maxPrice}
@@ -61,11 +62,11 @@ export default function FiltersBar({
           />
         </div>
 
-        <div className="relative z-30">
+        <div className="relative z-30 w-full sm:w-auto">
           <BedBathDropdown filters={filters} setFilters={setFilters} />
         </div>
 
-        <div className="w-[250px] min-w-0 relative z-30">
+        <div className="relative z-30 w-full sm:w-[250px] min-w-0">
           <CountyCityMultiSelect
             selectedCities={filters.cities}
             setSelectedCities={setCities}
