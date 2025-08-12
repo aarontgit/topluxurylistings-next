@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
 
 type ListingCardProps = {
   listing: any;
@@ -7,7 +7,6 @@ type ListingCardProps = {
   onExpand?: () => void;
   onClose?: () => void;
   onInquire?: (listing: any) => void;
-  /** NEW: when true, expanded view shows single-image with arrows (mobile) */
   useMobileCarousel?: boolean;
 };
 
@@ -17,7 +16,7 @@ export default function ListingCard({
   onExpand,
   onClose,
   onInquire,
-  useMobileCarousel = false, // NEW
+  useMobileCarousel = false,
 }: ListingCardProps) {
   const images = [listing.Image, listing.Image2, listing.Image3].filter(Boolean);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -36,33 +35,89 @@ export default function ListingCard({
     }
   };
 
+  const getMonthlyPayment = () => {
+    if (!listing.Price) return null;
+    const priceNumber = parseFloat(
+      listing.Price.replace(/[^0-9.-]+/g, "")
+    );
+    if (isNaN(priceNumber)) return null;
+    return priceNumber / 143.165;
+  };
+
+  const monthlyPayment = getMonthlyPayment();
+
+  const ListingImage = ({
+    src,
+    className,
+    style,
+    overlayRoundedClass = "rounded-xl",
+  }: {
+    src: string;
+    className?: string;
+    style?: React.CSSProperties;
+    overlayRoundedClass?: string;
+  }) => {
+    const [broken, setBroken] = useState(false);
+    return (
+      <div className={`relative ${className || ""}`} style={style}>
+        {!broken ? (
+          <img
+            src={src}
+            alt="Listing"
+            className="w-full h-full object-cover"
+            draggable={false}
+            loading="lazy"
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <div
+            className={`absolute inset-0 grid place-items-center bg-gray-200 ${overlayRoundedClass}`}
+          >
+            <div className="flex flex-col items-center">
+              <Lock className="w-10 h-10 text-gray-600 opacity-80" />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       onClick={handleCardClick}
       className={`bg-white p-4 rounded-2xl border shadow-md ${isExpanded ? 'w-full max-w-5xl z-50 shadow-2xl border-gray-200' : 'cursor-pointer'} ${isExpanded ? '' : 'hover:shadow-lg transition group'}`}
-      style={isExpanded ? { overflowY: 'auto', maxHeight: '90vh' } : {}}
     >
       {isExpanded && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onClose?.(); }}
-          className="sticky top-4 left-4 z-50 text-sm text-black flex items-center gap-1 px-1 py-1"
-        >
-          <span>←</span> Back to Search
-        </button>
+        <div className="mt-2 mb-4 flex items-center justify-between relative">
+          {/* Left-aligned back button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onClose?.(); }}
+            className="z-50 text-sm text-black flex items-center gap-1 px-1 py-1"
+          >
+            <span>←</span> Back to Search
+          </button>
+
+          {/* Centered logo + title (desktop only) */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 hidden sm:flex">
+            <img
+              src="/logo.png"
+              alt="Top Luxury Listings Logo"
+              className="h-8 w-auto"
+            />
+            <h1 className="text-xl font-bold whitespace-nowrap">Top Luxury Listings</h1>
+          </div>
+        </div>
       )}
 
       {isExpanded ? (
-        /** NEW: on mobile (flagged), show single image + arrows instead of grid */
         useMobileCarousel ? (
           <div className="relative mt-6">
             <div className="w-full overflow-hidden rounded-xl" style={{ aspectRatio: '4 / 3' }}>
               {images[0] && (
-                <img
+                <ListingImage
                   src={images[currentImageIndex]}
-                  alt="Main"
-                  className="w-full h-full object-cover rounded-xl"
-                  draggable={false}
-                  loading="lazy"
+                  className="w-full h-full rounded-xl"
+                  overlayRoundedClass="rounded-xl"
                 />
               )}
             </div>
@@ -86,31 +141,30 @@ export default function ListingCard({
             )}
           </div>
         ) : (
-          // Original desktop grid layout (unchanged)
           <div className="grid grid-cols-3 gap-4 mt-6">
             <div className="col-span-2">
-              <img
+              <ListingImage
                 src={images[0]}
-                alt="Main"
-                className="w-full h-full object-cover rounded-xl"
+                className="w-full h-full rounded-xl"
                 style={{ aspectRatio: '4 / 3' }}
+                overlayRoundedClass="rounded-xl"
               />
             </div>
             <div className="flex flex-col gap-4">
               {images[1] && (
-                <img
+                <ListingImage
                   src={images[1]}
-                  alt="Side 1"
-                  className="w-full object-cover rounded-xl"
+                  className="w-full rounded-xl"
                   style={{ aspectRatio: '4 / 3' }}
+                  overlayRoundedClass="rounded-xl"
                 />
               )}
               {images[2] && (
-                <img
+                <ListingImage
                   src={images[2]}
-                  alt="Side 2"
-                  className="w-full object-cover rounded-xl"
+                  className="w-full rounded-xl"
                   style={{ aspectRatio: '4 / 3' }}
+                  overlayRoundedClass="rounded-xl"
                 />
               )}
             </div>
@@ -118,10 +172,10 @@ export default function ListingCard({
         )
       ) : images.length > 0 && (
         <div className="relative group">
-          <img
+          <ListingImage
             src={images[currentImageIndex]}
-            alt="listing"
-            className="w-full h-48 object-cover rounded"
+            className="w-full h-48 rounded"
+            overlayRoundedClass="rounded"
           />
           {images.length > 1 && (
             <>
@@ -148,9 +202,7 @@ export default function ListingCard({
         </div>
       )}
 
-      {/* CHANGED: grid is 1 col on mobile so address can use full width */}
       <div className={`mt-6 ${isExpanded ? 'grid grid-cols-1 sm:grid-cols-3 gap-6 items-start' : ''}`}>
-        {/* CHANGED: span 2 cols only on sm+ */}
         <div className="sm:col-span-2 space-y-2">
           <h2 className="text-2xl font-bold">{listing.Address}</h2>
           <div className="flex flex-wrap gap-4 text-gray-700">
@@ -159,11 +211,17 @@ export default function ListingCard({
             <div className="flex items-center gap-2">📐 {listing.SqFt}</div>
           </div>
           <p className="text-xl font-bold text-blue-700">{listing.Price}</p>
+
+          {isExpanded && monthlyPayment !== null && (
+          <p className="text-sm text-gray-600">
+            Est. Monthly Payment:{" "}
+            ${monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        )}
         </div>
 
         {isExpanded && (
           <>
-            {/* Desktop layout (unchanged) */}
             <div className="hidden sm:flex flex-col items-end gap-3 border border-gray-300 p-4 rounded-lg w-full">
               <div className="w-full flex flex-col items-end max-w-full">
                 <button
@@ -173,7 +231,7 @@ export default function ListingCard({
                   }}
                   className="bg-blue-600 text-white py-2 px-6 text-sm rounded hover:bg-blue-700 w-full"
                 >
-                  Inquire
+                  Request Showing
                 </button>
                 <button
                   onClick={(e) => e.stopPropagation()}
@@ -183,30 +241,30 @@ export default function ListingCard({
                 </button>
               </div>
             </div>
+            
+        {/* Mobile expanded card */}
+        <div className="sm:hidden sticky bottom-0 bg-white border-t border-gray-300 p-4 z-50">
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onInquire?.(listing);
+              }}
+              className="bg-blue-600 text-white py-3 text-sm rounded hover:bg-blue-700 w-full"
+            >
+              Request Showing
+            </button>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white text-blue-600 border border-blue-600 py-3 text-sm rounded hover:bg-blue-50 w-full"
+            >
+              Contact Agent
+            </button>
+          </div>
+        </div>
 
-            {/* Mobile fixed bottom bar */}
-            <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-4 z-50">
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onInquire?.(listing);
-                  }}
-                  className="bg-blue-600 text-white py-3 text-sm rounded hover:bg-blue-700 w-full"
-                >
-                  Inquire
-                </button>
-                <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="bg-white text-blue-600 border border-blue-600 py-3 text-sm rounded hover:bg-blue-50 w-full"
-                >
-                  Contact Agent
-                </button>
-              </div>
-            </div>
           </>
         )}
-
       </div>
 
       {!isExpanded && (
