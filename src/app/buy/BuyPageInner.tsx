@@ -279,11 +279,20 @@ function ListingsPageInner() {
         beds: filters.beds ? parseInt(filters.beds) : undefined,
         exactBeds: filters.exactBeds,
         baths: filters.baths ? parseInt(filters.baths) : undefined,
-        cities: zipOverride ? undefined :
-                cityOverride ? [cityOverride] :
-                countyOverride ? undefined :
-                filters.cities.length > 0 ? filters.cities : undefined,
-        county: zipOverride ? undefined : countyOverride ?? undefined,
+  
+        // ⬇️ CHANGED: cities now override county when present
+        cities: zipOverride
+          ? undefined
+          : cityOverride
+            ? [cityOverride]
+            : (filters.cities.length > 0 ? filters.cities : undefined),
+  
+        county: zipOverride
+          ? undefined
+          : (cityOverride || filters.cities.length > 0)
+            ? undefined
+            : (countyOverride ?? undefined),
+  
         zip: zipOverride ?? undefined,
         citySearch: input,
       });
@@ -305,6 +314,7 @@ function ListingsPageInner() {
       setLoading(false);
     }
   };
+  
 
   const handleSearchFromAutocomplete = (
     input: string,

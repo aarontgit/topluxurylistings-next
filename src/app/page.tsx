@@ -20,6 +20,18 @@ export default function HomePage() {
   const router = useRouter();
   const [searchInput, setSearchInput] = useState("");
 
+  // NEW: detect desktop to mirror Buy page behavior
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent | MediaQueryList) =>
+      setIsDesktop("matches" in e ? e.matches : (e as MediaQueryList).matches);
+    onChange(mq);
+    mq.addEventListener?.("change", onChange as (e: MediaQueryListEvent) => void);
+    return () => mq.removeEventListener?.("change", onChange as (e: MediaQueryListEvent) => void);
+  }, []);
+
   useEffect(() => {
     const fetchLocationAndListings = async () => {
       try {
@@ -53,12 +65,12 @@ export default function HomePage() {
 
   return (
     <GoogleMapsLoader>
-      <div className="min-h-screen flex flex-col text-white relative">
+      <div className="min-h-screen flex flex-col relative">
         <NavBar />
 
         {/* Hero Banner with Image and Search */}
         <div
-          className="relative w-full bg-cover bg-center"
+          className="relative w-full bg-cover bg-bottom lg:bg-center"
           style={{
             backgroundImage: 'url("/homepage-real-estate-banner.png")',
             height: "520px",
@@ -114,7 +126,7 @@ export default function HomePage() {
                       >
                         <Image
                           src={listing.Image}
-                          alt={listing.Address}
+                          alt={listing.Address || "Listing photo"}
                           width={400}
                           height={300}
                           className="rounded mb-4 object-cover w-full h-[180px]"
@@ -147,14 +159,18 @@ export default function HomePage() {
         {/* Expanded ListingCard Overlay */}
         {selectedListing && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 lg:items-center sm:items-start sm:pt-4"
             onClick={() => setExpandedId(null)}
           >
-            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-4xl mx-auto">
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-4xl mx-auto sm:mx-2 sm:mt-4 relative"
+            >
               <ListingCard
                 listing={selectedListing}
                 isExpanded={true}
                 onClose={() => setExpandedId(null)}
+                useMobileCarousel={!isDesktop}
               />
             </div>
           </div>

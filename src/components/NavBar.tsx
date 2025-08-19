@@ -21,6 +21,15 @@ export default function NavBar() {
   const navRef = useRef<HTMLDivElement>(null);
   const auth = getAuth(app);
 
+  // --- GA helper (inline, no new imports) ---
+  const track = (name: string, params?: Record<string, any>) => {
+    (window as any)?.gtag?.("event", name, params || {});
+  };
+  const getViewportLocation = () => {
+    if (typeof window === "undefined") return "desktop";
+    return window.matchMedia("(min-width: 768px)").matches ? "desktop" : "mobile";
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
@@ -36,7 +45,8 @@ export default function NavBar() {
 
   const handleSignOut = async () => {
     try {
-      window.gtag?.("event", "user_signed_out", {
+      track("auth_sign_out_click", { source: "navbar", location: getViewportLocation() });
+      (window as any).gtag?.("event", "user_signed_out", {
         event_category: "Auth",
         user_email: auth.currentUser?.email || "(unknown)",
       });
@@ -61,6 +71,9 @@ export default function NavBar() {
         <Link
           href="/"
           className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-2"
+          onClick={() =>
+            track("nav_click", { item: "logo", location: getViewportLocation(), href: "/" })
+          }
         >
           {/* Desktop view (logo + text) */}
           <div className="hidden md:flex items-center space-x-2">
@@ -91,6 +104,13 @@ export default function NavBar() {
                 key={link}
                 href={`/${link}`}
                 className="uppercase tracking-wide text-gray-800 hover:text-gold-500 transition-colors"
+                onClick={() =>
+                  track("nav_click", {
+                    item: link,
+                    location: "desktop",
+                    href: `/${link}`,
+                  })
+                }
               >
                 {link.charAt(0).toUpperCase() + link.slice(1)}
               </Link>
@@ -104,6 +124,13 @@ export default function NavBar() {
                 key={link}
                 href={`/${link}`}
                 className="uppercase tracking-wide text-gray-800 hover:text-gold-500 transition-colors"
+                onClick={() =>
+                  track("nav_click", {
+                    item: link,
+                    location: "desktop",
+                    href: `/${link}`,
+                  })
+                }
               >
                 {link.charAt(0).toUpperCase() + link.slice(1)}
               </Link>
@@ -112,10 +139,17 @@ export default function NavBar() {
             <div className="relative">
               <button
                 onClick={() => {
+                  track("nav_profile_icon_click", {
+                    location: "desktop",
+                    authed: !!user,
+                  });
                   if (user) {
-                    setShowProfileMenu((prev) => !prev);
+                    const next = !showProfileMenu;
+                    setShowProfileMenu(next);
+                    track("nav_profile_menu_toggle", { location: "desktop", open: next });
                   } else {
                     setShowAuthModal(true);
+                    track("auth_modal_open", { source: "navbar", location: "desktop" });
                   }
                 }}
                 className="p-2 rounded-full hover:bg-gray-100"
@@ -141,7 +175,10 @@ export default function NavBar() {
         <button
           className="md:hidden flex items-center"
           aria-label="Open menu"
-          onClick={() => setMobileOpen(true)}
+          onClick={() => {
+            setMobileOpen(true);
+            track("nav_menu_toggle", { location: "mobile", open: true });
+          }}
         >
           <Menu className="h-7 w-7 text-gray-900" />
         </button>
@@ -153,7 +190,12 @@ export default function NavBar() {
           <div className="bg-white text-black w-72 h-full p-6 space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold">Menu</h2>
-              <button onClick={() => setMobileOpen(false)}>
+              <button
+                onClick={() => {
+                  setMobileOpen(false);
+                  track("nav_menu_toggle", { location: "mobile", open: false, via: "close_button" });
+                }}
+              >
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -163,7 +205,14 @@ export default function NavBar() {
                 <Link
                   key={link}
                   href={`/${link}`}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => {
+                    track("nav_click", {
+                      item: link,
+                      location: "mobile",
+                      href: `/${link}`,
+                    });
+                    setMobileOpen(false);
+                  }}
                   className="uppercase font-semibold tracking-wide text-gray-900"
                 >
                   {link.charAt(0).toUpperCase() + link.slice(1)}
@@ -176,6 +225,7 @@ export default function NavBar() {
                     onClick={() => {
                       handleSignOut();
                       setMobileOpen(false);
+                      // handleSignOut already tracks events
                     }}
                     className="bg-gold-500 text-black px-3 py-2 rounded hover:bg-gold-400 text-sm transition"
                   >
@@ -187,6 +237,7 @@ export default function NavBar() {
                   onClick={() => {
                     setShowAuthModal(true);
                     setMobileOpen(false);
+                    track("auth_modal_open", { source: "navbar", location: "mobile" });
                   }}
                   className="bg-gold-500 text-black px-3 py-2 rounded hover:bg-gold-400 text-sm transition"
                 >
@@ -197,13 +248,19 @@ export default function NavBar() {
           </div>
           <div
             className="flex-1"
-            onClick={() => setMobileOpen(false)}
+            onClick={() => {
+              setMobileOpen(false);
+              track("nav_menu_toggle", { location: "mobile", open: false, via: "backdrop" });
+            }}
             aria-label="Close menu"
           />
         </div>
       )}
 
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {showAuthModal && <AuthModal onClose={() => {
+        setShowAuthModal(false);
+        track("auth_modal_close", { source: "navbar", location: getViewportLocation() });
+      }} />}
     </nav>
   );
 }
