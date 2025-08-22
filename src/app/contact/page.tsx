@@ -2,6 +2,7 @@ import NavBar from "../../components/NavBar";
 import Footer from "../../components/Footer";
 import ChatSection from "../../components/ChatSection";
 import ContactForm from "../../components/ContactForm";
+import { Suspense } from "react";
 
 export default function ContactPage() {
   return (
@@ -13,7 +14,9 @@ export default function ContactPage() {
         <p className="text-gray-700 mb-6">
           Please fill out the form below and our team will reach out shortly.
         </p>
+        <Suspense>
         <ContactForm />
+        </Suspense>
         <ChatSection />
       </main>
       <Footer />
