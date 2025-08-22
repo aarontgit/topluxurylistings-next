@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signInWithEmail, signUpWithEmail } from "../lib/auth";
 import { signInWithPopup } from "firebase/auth";
 import { auth, provider } from "../lib/firebase";
@@ -15,10 +15,27 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState("");
 
+  // --- GA helper (inline, no new imports) ---
+  const track = (name: string, params?: Record<string, any>) => {
+    (window as any)?.gtag?.("event", name, params || {});
+  };
+  const setGaUser = (uid?: string | null, props?: Record<string, any>) => {
+    (window as any)?.gtag?.("set", { user_id: uid ?? null });
+    if (props) (window as any)?.gtag?.("set", "user_properties", props);
+  };
+
+  // Modal view
+  useEffect(() => {
+    track("auth_modal_view", { mode });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleEmailAuth = async () => {
     try {
+      track("auth_sign_in_click", { source: "auth_modal", method: "password", mode });
+
       if (mode === "signup" && password !== confirmPassword) {
         setError("Passwords do not match.");
+        track("auth_error", { where: "email", code: "password_mismatch", mode });
         return;
       }
 
@@ -29,6 +46,12 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
       }
 
       await ensureUserDocument();
+
+      // ⬇️ NEW: attach GA to this Firebase user
+      const uid = auth.currentUser?.uid;
+      if (uid) setGaUser(uid, { auth_method: "password" });
+
+      track("auth_success", { method: "password", mode });
       onClose();
     } catch (err: any) {
       if (err instanceof FirebaseError) {
@@ -51,21 +74,44 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           default:
             setError("An unexpected error occurred.");
         }
+        track("auth_error", { where: "email", code: err.code, mode });
       } else {
         setError("Something went wrong.");
+        track("auth_error", { where: "email", code: "unknown", mode });
       }
     }
   };
 
   const handleGoogleAuth = async () => {
     try {
+      track("auth_sign_in_click", { source: "auth_modal", method: "google" });
       await signInWithPopup(auth, provider);
       await ensureUserDocument();
+
+      // ⬇️ NEW: attach GA to this Firebase user
+      const uid = auth.currentUser?.uid;
+      if (uid) setGaUser(uid, { auth_method: "google" });
+
+      track("auth_success", { method: "google" });
       onClose();
     } catch (err) {
       setError("Google sign-in failed.");
+      track("auth_error", { where: "google", code: (err as any)?.code || "google_signin_failed" });
     }
   };
+
+  const toggleMode = () => {
+    const next = mode === "signin" ? "signup" : "signin";
+    track("auth_mode_toggle", { from: mode, to: next });
+    setMode(next);
+  };
+
+  const toggleShowPassword = () => {
+    const next = !showPassword;
+    track("auth_password_visibility", { show: next });
+    setShowPassword(next);
+  };
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -92,7 +138,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           />
           <span
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500 cursor-pointer"
-            onClick={() => setShowPassword(!showPassword)}
+            onClick={toggleShowPassword}
           >
             {showPassword ? "Hide" : "Show"}
           </span>
@@ -109,7 +155,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
             />
             <span
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500 cursor-pointer"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={toggleShowPassword}
             >
               {showPassword ? "Hide" : "Show"}
             </span>
@@ -145,7 +191,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
 
         <p
           className="text-sm text-center text-blue-600 cursor-pointer hover:underline"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          onClick={toggleMode}
         >
           {mode === "signin"
             ? "New here? Create an account"
@@ -153,10 +199,13 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         </p>
 
         <button
-          onClick={onClose}
+          onClick={() => {
+            track("auth_modal_cancel", { where: "button" });
+            onClose();
+          }}
           className="text-sm text-gray-400 text-center w-full hover:text-gray-600"
         >
-          Cancel
+            Cancel
         </button>
       </div>
     </div>

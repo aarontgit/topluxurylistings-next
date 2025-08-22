@@ -46,6 +46,20 @@ export default function BedBathDropdown({
     width: 0,
   });
 
+  // --- GA helper ---
+  const track = (name: string, params?: Record<string, any>) =>
+    (window as any)?.gtag?.("event", name, params || {});
+  const toNum = (v: string) => {
+    if (v === "" || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Remember values at open to detect "apply on close"
+  const initialBedsRef = useRef<string>("");
+  const initialBathsRef = useRef<string>("");
+  const initialExactRef = useRef<boolean>(false);
+
   const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
   const reposition = () => {
     const btn = btnRef.current;
@@ -67,8 +81,26 @@ export default function BedBathDropdown({
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panelRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+
+      // closing via outside click
+      const changed =
+        initialBedsRef.current !== filters.beds ||
+        initialBathsRef.current !== filters.baths ||
+        initialExactRef.current !== filters.exactBeds;
+
+      if (changed) {
+        track("filter_applied", {
+          type: "bedbath",
+          beds: toNum(filters.beds),
+          baths: toNum(filters.baths),
+          exactBeds: !!filters.exactBeds,
+          via: "outside_click",
+        });
+      }
+      track("bedbath_dropdown_close", { via: "outside_click" });
       setOpen(false);
     };
+
     const onScrollOrResize = () => reposition();
 
     document.addEventListener("mousedown", onDown);
@@ -82,14 +114,32 @@ export default function BedBathDropdown({
       window.removeEventListener("resize", onScrollOrResize);
       window.removeEventListener("scroll", onScrollOrResize);
     };
-  }, [open]);
+  }, [open, filters.beds, filters.baths, filters.exactBeds]);
 
   const applyBeds = (val: string) => {
     setFilters((prev: any) => ({ ...prev, beds: val }));
+    track("beds_select", { value: toNum(val) });
+    // Selecting closes the panel; also count as apply
+    track("filter_applied", {
+      type: "beds",
+      beds: toNum(val),
+      baths: toNum(filters.baths),
+      exactBeds: !!filters.exactBeds,
+      via: "beds_button",
+    });
     setOpen(false);
   };
+
   const applyBaths = (val: string) => {
     setFilters((prev: any) => ({ ...prev, baths: val }));
+    track("baths_select", { value: toNum(val) });
+    track("filter_applied", {
+      type: "baths",
+      beds: toNum(filters.beds),
+      baths: toNum(val),
+      exactBeds: !!filters.exactBeds,
+      via: "baths_button",
+    });
     setOpen(false);
   };
 
@@ -98,11 +148,42 @@ export default function BedBathDropdown({
       <button
         ref={btnRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => {
+            const next = !v;
+            if (next) {
+              initialBedsRef.current = filters.beds;
+              initialBathsRef.current = filters.baths;
+              initialExactRef.current = filters.exactBeds;
+              track("bedbath_dropdown_open", {
+                beds: toNum(filters.beds),
+                baths: toNum(filters.baths),
+                exactBeds: !!filters.exactBeds,
+                via: "button",
+              });
+            } else {
+              const changed =
+                initialBedsRef.current !== filters.beds ||
+                initialBathsRef.current !== filters.baths ||
+                initialExactRef.current !== filters.exactBeds;
+
+              if (changed) {
+                track("filter_applied", {
+                  type: "bedbath",
+                  beds: toNum(filters.beds),
+                  baths: toNum(filters.baths),
+                  exactBeds: !!filters.exactBeds,
+                  via: "toggle_button",
+                });
+              }
+              track("bedbath_dropdown_close", { via: "toggle_button" });
+            }
+            return next;
+          });
+        }}
         className="relative border px-3 pr-9 py-1.5 rounded flex items-center bg-white w-full"
       >
         <span className="truncate">{label}</span>
-        {/* absolutely pin chevron to the right */}
         <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
       </button>
 
@@ -136,9 +217,11 @@ export default function BedBathDropdown({
                 <input
                   type="checkbox"
                   checked={filters.exactBeds}
-                  onChange={(e) =>
-                    setFilters((prev: any) => ({ ...prev, exactBeds: e.target.checked }))
-                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFilters((prev: any) => ({ ...prev, exactBeds: checked }));
+                    track("beds_exact_toggle", { value: checked });
+                  }}
                 />
                 <span className="text-sm">Exact beds</span>
               </label>

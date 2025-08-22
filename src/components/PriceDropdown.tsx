@@ -22,6 +22,19 @@ export default function PriceDropdown({ minPrice, maxPrice, setFilters }: PriceD
     width: 0,
   });
 
+  // --- GA helper ---
+  const track = (name: string, params?: Record<string, any>) =>
+    (window as any)?.gtag?.("event", name, params || {});
+  const toNum = (v: string) => {
+    if (!v) return null;
+    const n = Number(String(v).replace(/[^\d]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // remember values when panel opens to detect "apply on close"
+  const initialMinRef = useRef<string>("");
+  const initialMaxRef = useRef<string>("");
+
   const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
   const reposition = () => {
@@ -42,13 +55,29 @@ export default function PriceDropdown({ minPrice, maxPrice, setFilters }: PriceD
     setPanelStyle({ top, left, width });
   };
 
+  // outside click / resize / scroll handlers when OPEN
   useEffect(() => {
     if (!open) return;
+
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panelRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+
+      // closing via outside click
+      const changed =
+        initialMinRef.current !== minPrice || initialMaxRef.current !== maxPrice;
+      if (changed) {
+        track("filter_applied", {
+          type: "price",
+          min: toNum(minPrice),
+          max: toNum(maxPrice),
+          via: "outside_click",
+        });
+      }
+      track("price_dropdown_close", { via: "outside_click" });
       setOpen(false);
     };
+
     const onScrollOrResize = () => reposition();
 
     document.addEventListener("mousedown", onDown);
@@ -62,10 +91,24 @@ export default function PriceDropdown({ minPrice, maxPrice, setFilters }: PriceD
       window.removeEventListener("resize", onScrollOrResize);
       window.removeEventListener("scroll", onScrollOrResize);
     };
-  }, [open]);
+  }, [open, minPrice, maxPrice]);
 
+  // validate range + track transitions into/out of invalid state
+  const wasInvalidRef = useRef(false);
   useEffect(() => {
-    if (minPrice && maxPrice && Number(maxPrice) < Number(minPrice)) {
+    const minN = toNum(minPrice);
+    const maxN = toNum(maxPrice);
+    const isInvalid = minN != null && maxN != null && maxN < minN;
+
+    if (isInvalid && !wasInvalidRef.current) {
+      track("price_invalid_range", { min: minN, max: maxN });
+    }
+    if (!isInvalid && wasInvalidRef.current) {
+      track("price_invalid_range_resolved", { min: minN, max: maxN });
+    }
+    wasInvalidRef.current = isInvalid;
+
+    if (isInvalid) {
       setPriceWarning("Max price should be greater than or equal to min price.");
     } else {
       setPriceWarning("");
@@ -83,15 +126,39 @@ export default function PriceDropdown({ minPrice, maxPrice, setFilters }: PriceD
   const handleChange = (name: "minPrice" | "maxPrice", value: string) => {
     const raw = value.replace(/[^\d]/g, "");
     setFilters((prev: any) => ({ ...prev, [name]: raw }));
+    track("price_input_change", { field: name, value: raw ? Number(raw) : null });
   };
 
   return (
     <div className="relative w-full sm:w-60">
-      {/* CHANGED: relative + pr-9 and absolutely positioned chevron (matches Bed/Bath) */}
       <button
         ref={btnRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => {
+            const next = !v;
+            if (next) {
+              // opening via button
+              initialMinRef.current = minPrice;
+              initialMaxRef.current = maxPrice;
+              track("price_dropdown_open", { min: toNum(minPrice), max: toNum(maxPrice), via: "button" });
+            } else {
+              // closing via button, fire apply if changed
+              const changed =
+                initialMinRef.current !== minPrice || initialMaxRef.current !== maxPrice;
+              if (changed) {
+                track("filter_applied", {
+                  type: "price",
+                  min: toNum(minPrice),
+                  max: toNum(maxPrice),
+                  via: "toggle_button",
+                });
+              }
+              track("price_dropdown_close", { via: "toggle_button" });
+            }
+            return next;
+          });
+        }}
         className="relative border px-3 pr-9 py-1.5 rounded flex items-center bg-white w-full"
       >
         <span className="truncate">{getPriceLabel()}</span>
@@ -126,9 +193,7 @@ export default function PriceDropdown({ minPrice, maxPrice, setFilters }: PriceD
                 className="w-full border px-3 py-2 rounded"
                 placeholder="No Max"
               />
-              {priceWarning && (
-                <p className="text-red-500 text-sm mt-2">{priceWarning}</p>
-              )}
+              {priceWarning && <p className="text-red-500 text-sm mt-2">{priceWarning}</p>}
             </div>
           </div>
         </Portal>

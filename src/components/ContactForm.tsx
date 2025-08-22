@@ -1,36 +1,56 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation"; // ✅ added
 
 export default function ContactForm() {
+  // --- GA helper (no PII) ---
+  const track = (name: string, params?: Record<string, any>) =>
+    (window as any)?.gtag?.("event", name, params || {});
+
+  const OPTIONS = [
+    { label: "I'm interested in selling a home", code: "selling" as const },
+    { label: "I'm interested in buying a home", code: "buying" as const },
+    { label: "I want more information about Colorado Real Estate", code: "info" as const },
+    { label: "I'm interested in home prep services", code: "prep" as const },
+    { label: "Other", code: "other" as const },
+  ];
+  type InterestCode = typeof OPTIONS[number]["code"];
+  type ContactMethod = "phone" | "email";
+
   const [submitted, setSubmitted] = useState(false);
   const [formAttempted, setFormAttempted] = useState(false);
-  const [validAddress, setValidAddress] = useState(false);
-  const [addressError, setAddressError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [interestCode, setInterestCode] = useState<InterestCode>("selling");
+  const [method, setMethod] = useState<ContactMethod>("phone");
 
-  const addressInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
+  const searchParams = useSearchParams(); // ✅ added
+
+  // ✅ prefill interest from query (?interest=prep|selling|buying|info|other)
   useEffect(() => {
-    if (!addressInputRef.current || !(window as any).google) return; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const q = searchParams.get("interest");
+    if (!q) return;
+    const valid = new Set(OPTIONS.map(o => o.code));
+    if (valid.has(q as InterestCode)) {
+      setInterestCode(q as InterestCode);
+      (window as any)?.gtag?.("event", "contact_interest_prefill", { interest: q });
+    }
+  }, [searchParams]); // minimal deps
 
-    const google = (window as any).google; // eslint-disable-line @typescript-eslint/no-explicit-any
-    const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-    });
-
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (place.formatted_address) {
-        setValidAddress(true);
-        setAddressError("");
-      } else {
-        setValidAddress(false);
-      }
-    });
+  // Form view
+  useEffect(() => {
+    track("contact_form_view");
   }, []);
+
+  // Clear the other field's error when switching method
+  useEffect(() => {
+    if (method === "phone") setEmailError("");
+    else setPhoneError("");
+  }, [method]);
 
   const validatePhone = (phone: string) => {
     const phoneRegex =
@@ -38,32 +58,48 @@ export default function ContactForm() {
     return phoneRegex.test(phone);
   };
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const selectedLabel = OPTIONS.find((o) => o.code === interestCode)!.label;
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormAttempted(true);
 
-    const phone = phoneInputRef.current?.value || "";
-    const isPhoneValid = validatePhone(phone);
+    track("contact_submit_attempt", { interest: interestCode, method });
 
-    if (!validAddress) {
-      setAddressError("Please pick a valid address from the dropdown.");
-    }
-
-    if (!isPhoneValid) {
-      setPhoneError("Please enter a valid US phone number.");
+    if (method === "phone") {
+      const phone = phoneInputRef.current?.value || "";
+      const isPhoneValid = validatePhone(phone);
+      if (!isPhoneValid) {
+        setPhoneError("Please enter a valid US phone number.");
+        track("contact_submit_blocked", { interest: interestCode, method, invalidPhone: true });
+        return;
+      } else {
+        setPhoneError("");
+      }
     } else {
-      setPhoneError("");
+      const email = emailInputRef.current?.value || "";
+      const isEmailValid = validateEmail(email);
+      if (!isEmailValid) {
+        setEmailError("Please enter a valid email address.");
+        track("contact_submit_blocked", { interest: interestCode, method, invalidEmail: true });
+        return;
+      } else {
+        setEmailError("");
+      }
     }
 
-    if (validAddress && isPhoneValid) {
-      setSubmitted(true);
-      (e.target as HTMLFormElement).submit();
-    }
+    setSubmitted(true);
+    track("contact_submit_success", { interest: interestCode, method });
+    (e.target as HTMLFormElement).submit();
   };
 
   return (
     <section className="bg-gray-100 rounded-2xl shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4">Get a Free Home Valuation</h2>
       <form
         action="https://script.google.com/macros/s/AKfycbxM5qdKnuTp7hn8eXcApIfy29B6EMFUHRtqPSruj34OfMfq9IOkbcCj_E-Qv10ojp4G/exec"
         method="POST"
@@ -71,6 +107,45 @@ export default function ContactForm() {
         onSubmit={handleSubmit}
         className="space-y-4"
       >
+        {/* Interest dropdown (posts the label string) */}
+        <div>
+          <label className="block text-sm font-medium mb-1">How can we help?</label>
+          <select
+            name="interest"
+            className="w-full p-3 rounded border border-gray-300 bg-white"
+            value={selectedLabel}
+            onChange={(e) => {
+              const next = OPTIONS.find((o) => o.label === e.target.value)?.code ?? "other";
+              setInterestCode(next);
+              track("contact_interest_change", { interest: next });
+            }}
+          >
+            {OPTIONS.map((opt) => (
+              <option key={opt.code} value={opt.label}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Preferred contact method */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Preferred method of contact</label>
+          <select
+            name="preferred_contact"
+            className="w-full p-3 rounded border border-gray-300 bg-white"
+            value={method}
+            onChange={(e) => {
+              const next = (e.target.value as ContactMethod) || "phone";
+              setMethod(next);
+              track("contact_method_change", { method: next });
+            }}
+          >
+            <option value="phone">Phone</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+
         <input
           type="text"
           name="name"
@@ -79,28 +154,35 @@ export default function ContactForm() {
           required
         />
 
-        <input
-          type="text"
-          name="address"
-          placeholder="Property Address"
-          ref={addressInputRef}
-          className="w-full p-3 rounded border border-gray-300"
-          required
-        />
-        {formAttempted && addressInputRef.current?.value && !validAddress && (
-          <p className="text-red-500 text-sm">{addressError}</p>
-        )}
-
-        <input
-          type="tel"
-          name="phone"
-          placeholder="Phone Number"
-          ref={phoneInputRef}
-          className="w-full p-3 rounded border border-gray-300"
-          required
-        />
-        {formAttempted && phoneError && (
-          <p className="text-red-500 text-sm">{phoneError}</p>
+        {/* Conditionally render only the chosen contact field */}
+        {method === "phone" ? (
+          <>
+            <input
+              type="tel"
+              name="phone"
+              placeholder="Phone Number"
+              ref={phoneInputRef}
+              className="w-full p-3 rounded border border-gray-300"
+              required
+            />
+            {formAttempted && phoneError && (
+              <p className="text-red-500 text-sm">{phoneError}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email Address"
+              ref={emailInputRef}
+              className="w-full p-3 rounded border border-gray-300"
+              required
+            />
+            {formAttempted && emailError && (
+              <p className="text-red-500 text-sm">{emailError}</p>
+            )}
+          </>
         )}
 
         <textarea
@@ -108,20 +190,24 @@ export default function ContactForm() {
           placeholder="Tell us anything else (optional)"
           className="w-full p-3 rounded border border-gray-300"
         />
+
         <div className="flex items-center">
           <input type="checkbox" className="mr-2" required />
           <label className="text-sm text-gray-600">
-            I agree to receive texts or calls from this business about selling my home.
+            I agree to receive texts or calls from this business about real estate services.
           </label>
         </div>
+
         <button
           type="submit"
           className="w-full bg-blue-600 text-white py-3 rounded font-semibold hover:bg-blue-700 transition"
         >
-          Get My Free Consultation
+          Send
         </button>
+
         <iframe name="hidden_iframe" style={{ display: "none" }} />
       </form>
+
       {submitted && (
         <p className="text-green-600 mt-2">✅ Form submitted! We’ll be in touch soon.</p>
       )}

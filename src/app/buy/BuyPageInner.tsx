@@ -60,6 +60,10 @@ export default function ListingsPage(){
 }
 
 function ListingsPageInner() {
+  // --- GA helper (minimal; no PII) ---
+  const track = (name: string, params?: Record<string, any>) =>
+    (window as any)?.gtag?.("event", name, params || {});
+
   const [isClient, setIsClient] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [cursorDoc, setCursorDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -381,6 +385,8 @@ function ListingsPageInner() {
   
 
   const handleLoadMore = () => {
+    // ✅ MAIN INTERACTION: load more
+    track("listings_load_more_click", { hasCursor: !!cursorDoc });
     handleSearchWithFilters(searchInput, undefined, filters.county ?? undefined, undefined, cursorDoc);
   };
 
@@ -427,7 +433,12 @@ function ListingsPageInner() {
         {/* ✅ Mobile Filters toggle */}
         <div className="lg:hidden mb-3">
           <button
-            onClick={() => setShowFilters(prev => !prev)}
+            onClick={() => {
+              const next = !showFilters;
+              setShowFilters(next);
+              // ✅ MAIN INTERACTION: toggle filters sheet
+              track("filters_toggle", { open: next });
+            }}
             aria-expanded={showFilters}
             className="w-full px-4 py-2 bg-blue-600 text-white rounded"
           >
@@ -454,7 +465,11 @@ function ListingsPageInner() {
             {/* overlay */}
             <div
               className="absolute inset-0 bg-black/50"
-              onClick={() => setShowFilters(false)}
+              onClick={() => {
+                setShowFilters(false);
+                // ✅ MAIN INTERACTION: close filters via backdrop
+                track("filters_sheet_close", { via: "backdrop" });
+              }}
               aria-hidden="true"
             />
             {/* sheet at the TOP */}
@@ -462,7 +477,11 @@ function ListingsPageInner() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-base font-semibold">Filters</h3>
                 <button
-                  onClick={() => setShowFilters(false)}
+                  onClick={() => {
+                    setShowFilters(false);
+                    // ✅ MAIN INTERACTION: close filters via button
+                    track("filters_sheet_close", { via: "button" });
+                  }}
                   className="text-sm px-3 py-1 border rounded"
                   aria-label="Close filters"
                 >
@@ -481,7 +500,11 @@ function ListingsPageInner() {
               />
 
               <button
-                onClick={() => setShowFilters(false)}
+                onClick={() => {
+                  setShowFilters(false);
+                  // ✅ MAIN INTERACTION: apply filters
+                  track("filters_apply_click");
+                }}
                 className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded"
               >
                 Apply
@@ -506,7 +529,12 @@ function ListingsPageInner() {
           <label className="text-sm font-medium mb-1">Sort</label>
           <select
             value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
+            onChange={(e) => {
+              setSortOrder(e.target.value);
+              // ✅ MAIN INTERACTION: sort change
+              const [field = "(default)", dir = "(default)"] = (e.target.value || "_").split("_");
+              track("sort_change", { field, dir });
+            }}
             className="border rounded px-3 py-2 text-sm"
           >
             <option value="">(Default)</option>
@@ -523,7 +551,11 @@ function ListingsPageInner() {
               listings={listings}
               hasMore={hasMore}
               loading={loading}
-              onExpand={(id) => setExpandedId(id)}
+              onExpand={(id) => {
+                setExpandedId(id);
+                // ✅ MAIN INTERACTION: expand listing card
+                track("listing_expand", { listingId: id });
+              }}
               onLoadMore={handleLoadMore}
             />
           </div>
@@ -538,11 +570,22 @@ function ListingsPageInner() {
 
         {expandedListing && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black bg-opacity-50" onClick={closeExpanded}></div>
+            <div
+              className="absolute inset-0 bg-black bg-opacity-50"
+              onClick={() => {
+                // ✅ MAIN INTERACTION: close overlay via backdrop
+                track("listing_overlay_close", { listingId: expandedListing.id, via: "backdrop" });
+                closeExpanded();
+              }}
+            />
             <ListingCard
               listing={expandedListing}
               isExpanded={true}
-              onClose={closeExpanded}
+              onClose={() => {
+                // ✅ MAIN INTERACTION: close overlay via close button
+                track("listing_overlay_close", { listingId: expandedListing.id, via: "button" });
+                closeExpanded();
+              }}
               onInquire={handleInquire}
               useMobileCarousel={!isDesktop} // ✅ only necessary change
             />

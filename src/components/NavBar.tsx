@@ -31,7 +31,11 @@ export default function NavBar() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    // ⬇️ Set GA user_id whenever auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      (window as any)?.gtag?.("set", { user_id: u?.uid ?? null });
+    });
     return () => unsubscribe();
   }, []);
 
@@ -45,10 +49,13 @@ export default function NavBar() {
 
   const handleSignOut = async () => {
     try {
+      // ⬇️ Clear GA user_id on sign-out
+      (window as any)?.gtag?.("set", { user_id: null });
+
       track("auth_sign_out_click", { source: "navbar", location: getViewportLocation() });
       (window as any).gtag?.("event", "user_signed_out", {
         event_category: "Auth",
-        user_email: auth.currentUser?.email || "(unknown)",
+        user_email: auth.currentUser?.email || "(unknown)", // consider removing PII
       });
       await signOut(auth);
       setShowProfileMenu(false);

@@ -20,6 +20,11 @@ export default function HomePage() {
   const router = useRouter();
   const [searchInput, setSearchInput] = useState("");
 
+  // --- GA helper (inline) ---
+  const track = (name: string, params?: Record<string, any>) => {
+    (window as any)?.gtag?.("event", name, params || {});
+  };
+
   // NEW: detect desktop to mirror Buy page behavior
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
@@ -32,6 +37,11 @@ export default function HomePage() {
     return () => mq.removeEventListener?.("change", onChange as (e: MediaQueryListEvent) => void);
   }, []);
 
+  // Page view
+  useEffect(() => {
+    track("homepage_view");
+  }, []);
+
   useEffect(() => {
     const fetchLocationAndListings = async () => {
       try {
@@ -40,13 +50,18 @@ export default function HomePage() {
         const geo = await res.json();
         const city = geo.city;
 
+        track("homepage_geo_detect", { city: city || "(unknown)" });
+
         const results = await getRecommendedListings(city);
         const filtered = results.filter((l: any) => l.Beds);
         setRecommended(filtered);
+        track("trending_loaded", { count: filtered.length, source: "geo", city: city || "(unknown)" });
       } catch (err) {
+        track("homepage_geo_detect_error");
         const results = await getRecommendedListings("Denver");
         const filtered = results.filter((l: any) => l.Beds);
         setRecommended(filtered);
+        track("trending_loaded", { count: filtered.length, source: "fallback", city: "Denver" });
       }
     };
 
@@ -55,11 +70,20 @@ export default function HomePage() {
 
   const scrollLeft = () => {
     scrollRef.current?.scrollBy({ left: -400, behavior: "smooth" });
+    track("trending_scroll", { direction: "left" });
   };
 
   const scrollRight = () => {
     scrollRef.current?.scrollBy({ left: 400, behavior: "smooth" });
+    track("trending_scroll", { direction: "right" });
   };
+
+  // Track overlay open
+  useEffect(() => {
+    if (expandedId) {
+      track("listing_overlay_open", { source: "trending", listingId: expandedId });
+    }
+  }, [expandedId]);
 
   const selectedListing = recommended.find((l) => l.id === expandedId);
 
@@ -85,6 +109,13 @@ export default function HomePage() {
                 value={searchInput}
                 onChange={setSearchInput}
                 onSearch={(input, cityOverride, countyOverride, zipOverride) => {
+                  track("search_initiated", {
+                    input,
+                    cityOverride: cityOverride || null,
+                    countyOverride: countyOverride || null,
+                    zipOverride: zipOverride || null,
+                    source: "homepage_searchbar",
+                  });
                   const params = new URLSearchParams();
                   params.set("input", input);
                   if (zipOverride) params.set("zip", zipOverride);
@@ -121,7 +152,10 @@ export default function HomePage() {
                         key={listing.id}
                         onMouseEnter={() => setHoveredId(listing.id)}
                         onMouseLeave={() => setHoveredId(null)}
-                        onClick={() => setExpandedId(listing.id)}
+                        onClick={() => {
+                          setExpandedId(listing.id);
+                          track("listing_expand", { source: "trending", listingId: listing.id });
+                        }}
                         className="min-w-[280px] max-w-[280px] bg-white border border-gray-200 rounded-xl p-4 shadow-md shrink-0 transition-transform duration-300 cursor-pointer hover:scale-[1.03]"
                       >
                         <Image
@@ -160,7 +194,10 @@ export default function HomePage() {
         {selectedListing && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 lg:items-center sm:items-start sm:pt-4"
-            onClick={() => setExpandedId(null)}
+            onClick={() => {
+              track("listing_overlay_close", { source: "trending", via: "backdrop" });
+              setExpandedId(null);
+            }}
           >
             <div
               onClick={(e) => e.stopPropagation()}
@@ -169,7 +206,10 @@ export default function HomePage() {
               <ListingCard
                 listing={selectedListing}
                 isExpanded={true}
-                onClose={() => setExpandedId(null)}
+                onClose={() => {
+                  track("listing_overlay_close", { source: "trending", via: "button" });
+                  setExpandedId(null);
+                }}
                 useMobileCarousel={!isDesktop}
               />
             </div>
