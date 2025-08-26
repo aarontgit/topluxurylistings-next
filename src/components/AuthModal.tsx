@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { signInWithEmail, signUpWithEmail } from "../lib/auth";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth"; // ✅ changed
 import { auth, provider } from "../lib/firebase";
 import { FirebaseError } from "firebase/app";
 import { ensureUserDocument } from "../lib/createUserDoc";
@@ -29,6 +29,25 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     track("auth_modal_view", { mode });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ✅ Complete redirect flow if we just returned from Google
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          await ensureUserDocument();
+          const uid = auth.currentUser?.uid;
+          if (uid) setGaUser(uid, { auth_method: "google" });
+          track("auth_success", { method: "google", via: "redirect_result" });
+          onClose();
+        }
+      } catch (e) {
+        console.error("getRedirectResult error:", e);
+        track("auth_error", { where: "google", code: "getRedirectResult_error" });
+      }
+    })();
+  }, []); // run once when modal mounts
+
   const handleEmailAuth = async () => {
     try {
       track("auth_sign_in_click", { source: "auth_modal", method: "password", mode });
@@ -47,7 +66,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
 
       await ensureUserDocument();
 
-      // ⬇️ NEW: attach GA to this Firebase user
       const uid = auth.currentUser?.uid;
       if (uid) setGaUser(uid, { auth_method: "password" });
 
@@ -82,20 +100,60 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // ✅ Helper: decide if we should avoid popups
+  const shouldForceRedirect = async () => {
+    if (typeof window === "undefined") return false;
+    const ua = navigator.userAgent || "";
+    const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+    let isBrave = false;
+    try {
+      isBrave = !!(navigator as any).brave && (await (navigator as any).brave.isBrave?.());
+    } catch {}
+    return isSafari || isBrave;
+  };
+
   const handleGoogleAuth = async () => {
     try {
       track("auth_sign_in_click", { source: "auth_modal", method: "google" });
-      await signInWithPopup(auth, provider);
-      await ensureUserDocument();
 
-      // ⬇️ NEW: attach GA to this Firebase user
+      // Optional but helpful: ensure account chooser appears
+      provider.setCustomParameters?.({ prompt: "select_account" });
+
+      // Some browsers (Brave/Safari) block popups/cookies -> go straight to redirect
+      if (await shouldForceRedirect()) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      // Try popup first
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (err: any) {
+        const code = err?.code as string | undefined;
+        // Fallback to redirect on common popup/cookie/domain issues
+        const fallbackCodes = new Set([
+          "auth/popup-blocked",
+          "auth/popup-closed-by-user",
+          "auth/cancelled-popup-request",
+          "auth/operation-not-supported-in-this-environment",
+          "auth/unauthorized-domain",
+        ]);
+        if (code && fallbackCodes.has(code)) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw err; // unknown error -> show message
+      }
+
+      // Popup succeeded
+      await ensureUserDocument();
       const uid = auth.currentUser?.uid;
       if (uid) setGaUser(uid, { auth_method: "google" });
-
-      track("auth_success", { method: "google" });
+      track("auth_success", { method: "google", via: "popup" });
       onClose();
     } catch (err) {
-      setError("Google sign-in failed.");
+      console.error("Google sign-in failed:", err);
+      setError("Google sign-in failed. Please try again.");
       track("auth_error", { where: "google", code: (err as any)?.code || "google_signin_failed" });
     }
   };
@@ -111,7 +169,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     track("auth_password_visibility", { show: next });
     setShowPassword(next);
   };
-
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -205,7 +262,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           }}
           className="text-sm text-gray-400 text-center w-full hover:text-gray-600"
         >
-            Cancel
+          Cancel
         </button>
       </div>
     </div>
