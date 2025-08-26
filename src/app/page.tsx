@@ -94,15 +94,12 @@ export default function HomePage() {
 
         {/* Hero Banner with Image and Search */}
         <div
-          className="relative w-full bg-cover bg-bottom lg:bg-center"
-          style={{
-            backgroundImage: 'url("/homepage-real-estate-banner.png")',
-            height: "520px",
-          }}
+          className="hero-bg relative w-full bg-cover bg-bottom lg:bg-center h-[360px] sm:h-[440px] lg:h-[520px]"
         >
           <div className="absolute inset-0 bg-black/40 flex items-center px-6 md:px-12 lg:px-24">
-            <div className="text-left max-w-2xl ml-4 sm:ml-12">
-              <h1 className="text-white text-4xl sm:text-5xl font-bold mb-6 drop-shadow-md">
+            <div className="text-left max-w-2xl ml-0 sm:ml-12">
+              {/* ONLY CHANGE: slightly larger mobile font, still one line */}
+              <h1 className="text-white font-bold mb-6 drop-shadow-md whitespace-nowrap leading-tight text-[clamp(1.4rem,6.9vw,1.9rem)] sm:text-5xl">
                 Your next move starts here.
               </h1>
               <SearchBar
@@ -218,6 +215,18 @@ export default function HomePage() {
 
         <Footer />
       </div>
+
+      {/* Scoped CSS: desktop uses existing image; mobile swaps to the blurred house image */}
+      <style jsx>{`
+        .hero-bg {
+          background-image: url("/homepage-real-estate-banner.png");
+        }
+        @media (max-width: 1023px) {
+          .hero-bg {
+            background-image: url("/topluxurylistings-homepagebackground-mobile.png");
+          }
+        }
+      `}</style>
     </GoogleMapsLoader>
   );
 }

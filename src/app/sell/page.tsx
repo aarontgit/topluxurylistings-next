@@ -81,7 +81,11 @@ export default function SellPage() {
         </section>
 
         {/* ---------- Article Section ---------- */}
-        <section id="selling-guide" className="py-16 px-6 max-w-3xl mx-auto">
+        <section
+          id="selling-guide"
+          className="py-16 px-6 max-w-3xl mx-auto"
+          style={{ scrollMarginTop: "calc(var(--navbar-height) + 8px)" }} // ✅ added offset
+        >
           <h2 className="text-3xl font-bold mb-6">Selling Your House (Without Losing Your Mind): A Practical Guide</h2>
           <p className="mb-6">
             Thinking about selling? Here’s the stuff that actually moves the needle—what to do, what to skip,

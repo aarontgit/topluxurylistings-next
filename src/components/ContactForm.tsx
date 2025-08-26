@@ -128,6 +128,9 @@ export default function ContactForm() {
           </select>
         </div>
 
+        {/* Reuse old "address" column for the interest selection */}
+        <input type="hidden" name="address" value={selectedLabel} />
+
         {/* Preferred contact method */}
         <div>
           <label className="block text-sm font-medium mb-1">Preferred method of contact</label>
@@ -173,7 +176,7 @@ export default function ContactForm() {
           <>
             <input
               type="email"
-              name="email"
+              name="phone"  // ← send email to the same Sheet column used for phone
               placeholder="Email Address"
               ref={emailInputRef}
               className="w-full p-3 rounded border border-gray-300"
