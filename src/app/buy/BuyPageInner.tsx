@@ -48,6 +48,18 @@ const formatCurrency = (val: string | number) => {
   return numeral(num).format("$0,0");
 };
 
+// Heuristic to detect a full street address (not just a city/county/zip)
+const isLikelyAddress = (s: string | null | undefined) => {
+  if (!s) return false;
+  const str = s.trim();
+  if (!str) return false;
+  const hasNumber = /\d/.test(str);
+  const hasStreetWord = /\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|ln|lane|ct|court|pl|place|way|pkwy|parkway|ter|terrace|cir|circle|unit|apt|suite)\b/i.test(
+    str
+  );
+  return hasNumber && hasStreetWord;
+};
+
 export default function ListingsPage(){
   return (
     <>
@@ -59,7 +71,6 @@ export default function ListingsPage(){
 }
 
 function ListingsPageInner() {
-  // --- GA helper (minimal; no PII) ---
   const track = (name: string, params?: Record<string, any>) =>
     (window as any)?.gtag?.("event", name, params || {});
 
@@ -87,10 +98,12 @@ function ListingsPageInner() {
   const [isZip, setIsZip] = useState(false);
   const [zipFallbackNotice, setZipFallbackNotice] = useState<string | null>(null);
   const [justSearchedFromAutocomplete, setJustSearchedFromAutocomplete] = useState(false);
-  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null); // existing
+  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null);
 
-  // ✅ NEW: track the active location coming from URL or autocomplete so all searches stay scoped
+  // Active location + pinned label/preposition
   const [activeLocation, setActiveLocation] = useState<{ zip?: string; city?: string; county?: string } | null>(null);
+  const [pinnedLabel, setPinnedLabel] = useState<string | null>(null);
+  const [pinnedIsAddress, setPinnedIsAddress] = useState<boolean>(false);
 
   // runtime media query
   const [isDesktop, setIsDesktop] = useState(false);
@@ -113,7 +126,7 @@ function ListingsPageInner() {
   // Apply URL params only once (including input)
   const [paramsApplied, setParamsApplied] = useState(false);
 
-  // Gate input-from-URL by paramsApplied so the user can edit/delete afterward
+  // Apply input= from URL once so user can edit/delete afterward
   useEffect(() => {
     if (paramsApplied) return;
     if (inputFromParams != null) {
@@ -131,25 +144,32 @@ function ListingsPageInner() {
     if (zip) {
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
       setIsZip(true);
-      setSearchLocationLabel(`ZIP Code ${zip}`);
-      setActiveLocation({ zip }); // ✅ scope by zip
+      const label = inputFromParams ?? `ZIP Code ${zip}`;
+      setSearchLocationLabel(label);
+      setPinnedLabel(label);
+      setPinnedIsAddress(isLikelyAddress(label));
+      setActiveLocation({ zip });
     } else if (city) {
       setFilters((prev) => ({ ...prev, cities: [city], county: null }));
       setIsZip(false);
       setSearchLocationLabel(city);
-      setActiveLocation({ city }); // ✅ scope by city
+      setPinnedLabel(inputFromParams ?? city);
+      setPinnedIsAddress(false);
+      setActiveLocation({ city });
     } else if (county) {
       const fullCounty = county.includes("County") ? county : `${county} County`;
       setFilters((prev) => ({ ...prev, cities: [], county: fullCounty }));
       setIsZip(false);
       setSearchLocationLabel(fullCounty);
-      setActiveLocation({ county: fullCounty }); // ✅ scope by county
+      setPinnedLabel(fullCounty);
+      setPinnedIsAddress(false);
+      setActiveLocation({ county: fullCounty });
     }
 
     setParamsApplied(true);
-  }, [searchParams, paramsApplied]);
+  }, [searchParams, paramsApplied, inputFromParams]);
 
-  // Trigger initial search using state (after params applied)
+  // Trigger initial scoped search once after params are applied
   useEffect(() => {
     if (!paramsApplied) return;
     if (!searchInput.trim() || justSearchedFromAutocomplete) return;
@@ -157,14 +177,11 @@ function ListingsPageInner() {
     const trimmed = searchInput.trim();
     const isZipMatch = /^\d{5}$/.test(trimmed);
 
-    // Prefer activeLocation overrides if present
     const cityOverride = activeLocation?.city;
     const countyOverride = activeLocation?.county;
     const zipOverride = activeLocation?.zip ?? (isZipMatch && !cityOverride && !countyOverride ? trimmed : undefined);
 
-    const shouldSearch =
-      !!cityOverride || !!countyOverride || !!zipOverride;
-
+    const shouldSearch = !!cityOverride || !!countyOverride || !!zipOverride;
     if (!shouldSearch) return;
 
     handleSearchWithFilters(
@@ -173,11 +190,10 @@ function ListingsPageInner() {
       countyOverride,
       zipOverride,
       null,
-      // label should reflect what user typed/selected (address string if present)
-      trimmed
+      pinnedLabel ?? trimmed
     );
     setJustSearchedFromAutocomplete(false);
-  }, [paramsApplied]); // run exactly once after params apply
+  }, [paramsApplied]); // run once after params application
 
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
@@ -195,7 +211,7 @@ function ListingsPageInner() {
     return () => unsubscribe();
   }, []);
 
-  // Subsequent searches rely purely on component state + activeLocation to keep scope
+  // Subsequent searches rely on state + activeLocation; label remains pinned
   useEffect(() => {
     if (justSearchedFromAutocomplete) {
       setJustSearchedFromAutocomplete(false);
@@ -206,7 +222,6 @@ function ListingsPageInner() {
     const trimmedInput = searchInput.trim();
     const isZipMatch = /^\d{5}$/.test(trimmedInput);
 
-    // Location overrides always taken from activeLocation first; fall back to filters if user chose city/county pickers
     const cityOverride = activeLocation?.city ?? (filters.cities.length > 0 ? filters.cities[0] : undefined);
     const countyOverride = activeLocation?.county ?? (filters.county ?? undefined);
     const zipOverride =
@@ -276,7 +291,7 @@ function ListingsPageInner() {
     }
   };
 
-  // Add optional labelOverride to keep full address label when provided
+  // Search helper — keeps the pinned label
   const handleSearchWithFilters = async (
     input: string,
     cityOverride?: string,
@@ -285,25 +300,28 @@ function ListingsPageInner() {
     cursorParam: QueryDocumentSnapshot<DocumentData> | null = null,
     labelOverride?: string,
   ) => {
-    // Don't auto-force ZIP if the user has selected a city/county (or overrides are provided)
+    // Don't auto-force ZIP if the user has selected a city/county (or overrides provided)
     const hasLocationContext =
       !!cityOverride || !!countyOverride || filters.cities.length > 0 || !!filters.county || !!activeLocation;
 
     if (/^\d{5}$/.test(input) && !zipOverride && !hasLocationContext) {
       setIsZip(true);
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
-      zipOverride = input; // promote instead of recursive re-entry
+      zipOverride = input;
     }
   
-    // Prefer explicit labelOverride (e.g., full address) over ZIP label
-    setSearchLocationLabel(
+    // ✅ keep existing address label if we have one (prevents flicker to ZIP Code)
+    const prevLabel = searchLocationLabel;
+    const nextLabel =
+      pinnedLabel ??
       labelOverride ??
-      (zipOverride
+      (isLikelyAddress(prevLabel) ? prevLabel : (zipOverride
         ? `ZIP Code ${zipOverride}`
         : cityOverride
           ? cityOverride
-          : countyOverride ?? input)
-    );
+          : countyOverride ?? input));
+
+    setSearchLocationLabel(nextLabel);
   
     const shouldSearch =
       cityOverride || countyOverride || zipOverride ||
@@ -323,12 +341,12 @@ function ListingsPageInner() {
         field = f;
         direction = d as 'asc' | 'desc';
       } else {
-        field = "RandomRank"; // default randomized order
+        field = "RandomRank";
         direction = "asc";
       }
   
       const { listings: newListings, nextPageCursor, zipFallback } = await getPublicListings({
-        pageSize: isDesktop ? 40 : 20, // fewer on mobile
+        pageSize: isDesktop ? 40 : 20,
         cursor: cursorParam,
         orderField: field,
         orderDirection: direction,
@@ -338,7 +356,6 @@ function ListingsPageInner() {
         exactBeds: filters.exactBeds,
         baths: filters.baths ? parseInt(filters.baths) : undefined,
   
-        // cities override county when present; zip wins over both
         cities: zipOverride
           ? undefined
           : cityOverride
@@ -382,14 +399,21 @@ function ListingsPageInner() {
   ) => {
     setSearchInput(input);
 
+    // ✅ moved: set this first so follow-up effects don't overwrite the label
+    setJustSearchedFromAutocomplete(true); // ✅ moved
+
     if (zip) {
       // Keep label as the full address the user selected, but query by ZIP
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
-      setActiveLocation({ zip }); // ✅ remember the ZIP so later effects stay scoped
-      handleSearchWithFilters(input, undefined, undefined, zip, null, input); // pass labelOverride
+      setActiveLocation({ zip });
+      setPinnedLabel(input);
+      setPinnedIsAddress(isLikelyAddress(input));
+      handleSearchWithFilters(input, undefined, undefined, zip, null, input);
     } else if (county === "Denver County") {
       setFilters((prev) => ({ ...prev, cities: [], county: "Denver County" }));
       setActiveLocation({ county: "Denver County" });
+      setPinnedLabel("Denver County");
+      setPinnedIsAddress(false);
       handleSearchWithFilters(input, undefined, "Denver County", undefined, null);
     } else {
       setFilters((prev) => ({
@@ -398,10 +422,13 @@ function ListingsPageInner() {
         county: county ?? null,
       }));
       setActiveLocation({ city: city || undefined, county: county || undefined });
+      const label = city || county || input;
+      setPinnedLabel(label);
+      setPinnedIsAddress(isLikelyAddress(label) && !!zip === false);
       handleSearchWithFilters(input, city, county, undefined, null);
     }
 
-    setJustSearchedFromAutocomplete(true);
+    // note: we flip it back to false in the effect that watches it
   };
 
   const loadListings = async (reset = false) => {
@@ -416,12 +443,12 @@ function ListingsPageInner() {
       field = f;
       direction = d as 'asc' | 'desc';
     } else {
-      field = "RandomRank"; // default randomized order
+      field = "RandomRank";
       direction = "asc";
     }
   
     const { listings: newListings, nextPageCursor } = await getPublicListings({
-      pageSize: isDesktop ? 40 : 20, // fewer on mobile
+      pageSize: isDesktop ? 40 : 20,
       cursor: reset ? null : cursorDoc,
       orderField: field,
       orderDirection: direction,
@@ -442,7 +469,6 @@ function ListingsPageInner() {
   
 
   const handleLoadMore = () => {
-    // MAIN INTERACTION: load more
     track("listings_load_more_click", { hasCursor: !!cursorDoc });
     const trimmed = searchInput.trim();
     const cityOverride = activeLocation?.city ?? (filters.cities.length > 0 ? filters.cities[0] : undefined);
@@ -454,8 +480,11 @@ function ListingsPageInner() {
   const setCities = (value: string[] | ((prev: string[]) => string[])) => {
     setFilters(prev => {
       const nextCities = typeof value === 'function' ? value(prev.cities) : value;
-      // ✅ keep activeLocation in sync when user chooses city via filters
       setActiveLocation(al => ({ ...(al || {}), city: nextCities[0], zip: undefined, county: undefined }));
+      if (nextCities[0]) {
+        setPinnedLabel(nextCities[0]);
+        setPinnedIsAddress(false);
+      }
       return { ...prev, cities: nextCities };
     });
   };
@@ -465,8 +494,11 @@ function ListingsPageInner() {
   ) => {
     setFilters(prev => {
       const nextCounty = typeof value === 'function' ? value(prev.county) : value;
-      // ✅ keep activeLocation in sync when user chooses county via filters
       setActiveLocation(al => ({ ...(al || {}), county: nextCounty || undefined, city: undefined, zip: undefined }));
+      if (nextCounty) {
+        setPinnedLabel(nextCounty);
+        setPinnedIsAddress(false);
+      }
       return { ...prev, county: nextCounty, cities: [] };
     });
   };
@@ -475,6 +507,9 @@ function ListingsPageInner() {
   const expandedListing = listings.find(l => l.id === expandedId);
 
   if (!isClient) return null;
+
+  // Choose preposition: "near" for addresses, otherwise "in"
+  const showPrepositionNear = pinnedLabel ? pinnedIsAddress : isLikelyAddress(searchLocationLabel);
 
   return (
     <>
@@ -488,7 +523,6 @@ function ListingsPageInner() {
               value={searchInput}
               onChange={setSearchInput}
               onSearch={handleSearchFromAutocomplete}
-              // Make the input fill its container on mobile
               inputClassName="w-full px-3 py-2 rounded-md bg-white text-black text-sm border border-gray-300"
             />
           </div>
@@ -525,7 +559,6 @@ function ListingsPageInner() {
         {/* Mobile filters as a TOP modal */}
         {showFilters && (
           <div className="lg:hidden fixed inset-0 z-[100]">
-            {/* overlay */}
             <div
               className="absolute inset-0 bg-black/50"
               onClick={() => {
@@ -534,7 +567,6 @@ function ListingsPageInner() {
               }}
               aria-hidden="true"
             />
-            {/* sheet */}
             <div className="absolute top-0 left-0 right-0 max-h-[90vh] bg-white rounded-b-2xl shadow-2xl p-4 overflow-visible">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-base font-semibold">Filters</h3>
@@ -575,7 +607,7 @@ function ListingsPageInner() {
 
         {searchLocationLabel && (
           <div className="mb-4 p-3 rounded bg-blue-50 text-blue-900 border-l-4 border-blue-500">
-            Showing listings near <strong>{searchLocationLabel}</strong>
+            Showing listings {showPrepositionNear ? "near" : "in"} <strong>{searchLocationLabel}</strong>
           </div>
         )}
 
@@ -599,8 +631,6 @@ function ListingsPageInner() {
             <option value="">(Default)</option>
             <option value="PriceNum_desc">Price (High to Low)</option>
             <option value="PriceNum_asc">Price (Low to High)</option>
-            {/*<option value="SqFtNum_desc">SqFt (High to Low)</option>*/}
-            {/*<option value="SqFtNum_asc">SqFt (Low to High)</option>*/}
           </select>
         </div>
 
