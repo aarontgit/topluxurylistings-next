@@ -22,7 +22,6 @@ import {
 import { app } from "../../lib/firebase";
 import { ensureUserDocument } from "../../lib/createUserDoc";
 import type { User } from "firebase/auth";
-import GoogleMapsLoader from "../../components/GoogleMapsLoader";
 import type { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -88,9 +87,12 @@ function ListingsPageInner() {
   const [isZip, setIsZip] = useState(false);
   const [zipFallbackNotice, setZipFallbackNotice] = useState<string | null>(null);
   const [justSearchedFromAutocomplete, setJustSearchedFromAutocomplete] = useState(false);
-  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null); // ✅ existing
+  const [searchLocationLabel, setSearchLocationLabel] = useState<string | null>(null); // existing
 
-  // ✅ NEW: runtime media query to know if desktop (lg: 1024px)
+  // ✅ NEW: track the active location coming from URL or autocomplete so all searches stay scoped
+  const [activeLocation, setActiveLocation] = useState<{ zip?: string; city?: string; county?: string } | null>(null);
+
+  // runtime media query
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -102,19 +104,26 @@ function ListingsPageInner() {
     return () => mq.removeEventListener?.("change", onChange as (e: MediaQueryListEvent) => void);
   }, []);
 
-  // ✅ Mobile filters toggle state (moved up to keep hook order stable)
+  // Mobile filters toggle
   const [showFilters, setShowFilters] = useState(false);
 
   const searchParams = useSearchParams();
   const inputFromParams = searchParams.get("input");
 
+  // Apply URL params only once (including input)
+  const [paramsApplied, setParamsApplied] = useState(false);
+
+  // Gate input-from-URL by paramsApplied so the user can edit/delete afterward
   useEffect(() => {
-    if (inputFromParams && searchInput !== inputFromParams) {
+    if (paramsApplied) return;
+    if (inputFromParams != null) {
       setSearchInput(inputFromParams);
     }
-  }, [inputFromParams]);
+  }, [paramsApplied, inputFromParams]);
 
   useEffect(() => {
+    if (paramsApplied) return;
+
     const zip = searchParams.get("zip") ?? "";
     const city = searchParams.get("city") ?? "";
     const county = searchParams.get("county") ?? "";
@@ -122,33 +131,53 @@ function ListingsPageInner() {
     if (zip) {
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
       setIsZip(true);
+      setSearchLocationLabel(`ZIP Code ${zip}`);
+      setActiveLocation({ zip }); // ✅ scope by zip
     } else if (city) {
       setFilters((prev) => ({ ...prev, cities: [city], county: null }));
       setIsZip(false);
+      setSearchLocationLabel(city);
+      setActiveLocation({ city }); // ✅ scope by city
     } else if (county) {
       const fullCounty = county.includes("County") ? county : `${county} County`;
       setFilters((prev) => ({ ...prev, cities: [], county: fullCounty }));
       setIsZip(false);
+      setSearchLocationLabel(fullCounty);
+      setActiveLocation({ county: fullCounty }); // ✅ scope by county
     }
-  }, []);
 
+    setParamsApplied(true);
+  }, [searchParams, paramsApplied]);
+
+  // Trigger initial search using state (after params applied)
   useEffect(() => {
+    if (!paramsApplied) return;
     if (!searchInput.trim() || justSearchedFromAutocomplete) return;
 
-    const zip = searchParams.get("zip") ?? "";
-    const city = searchParams.get("city") ?? "";
-    const county = searchParams.get("county") ?? "";
+    const trimmed = searchInput.trim();
+    const isZipMatch = /^\d{5}$/.test(trimmed);
 
-    const shouldSearch = zip || city || county;
+    // Prefer activeLocation overrides if present
+    const cityOverride = activeLocation?.city;
+    const countyOverride = activeLocation?.county;
+    const zipOverride = activeLocation?.zip ?? (isZipMatch && !cityOverride && !countyOverride ? trimmed : undefined);
+
+    const shouldSearch =
+      !!cityOverride || !!countyOverride || !!zipOverride;
+
     if (!shouldSearch) return;
 
-    const zipOverride = zip || undefined;
-    const cityOverride = city || undefined;
-    const countyOverride = county || undefined;
-
-    handleSearchWithFilters(searchInput.trim(), cityOverride, countyOverride, zipOverride);
+    handleSearchWithFilters(
+      trimmed,
+      cityOverride,
+      countyOverride,
+      zipOverride,
+      null,
+      // label should reflect what user typed/selected (address string if present)
+      trimmed
+    );
     setJustSearchedFromAutocomplete(false);
-  }, [filters, searchInput]);
+  }, [paramsApplied]); // run exactly once after params apply
 
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
@@ -166,32 +195,45 @@ function ListingsPageInner() {
     return () => unsubscribe();
   }, []);
 
+  // Subsequent searches rely purely on component state + activeLocation to keep scope
   useEffect(() => {
     if (justSearchedFromAutocomplete) {
       setJustSearchedFromAutocomplete(false);
       return;
     }
 
-    const { cities, county, minPrice, maxPrice, beds, baths } = filters;
+    const { minPrice, maxPrice, beds, baths } = filters;
     const trimmedInput = searchInput.trim();
-    const isZip = /^\d{5}$/.test(trimmedInput);
+    const isZipMatch = /^\d{5}$/.test(trimmedInput);
+
+    // Location overrides always taken from activeLocation first; fall back to filters if user chose city/county pickers
+    const cityOverride = activeLocation?.city ?? (filters.cities.length > 0 ? filters.cities[0] : undefined);
+    const countyOverride = activeLocation?.county ?? (filters.county ?? undefined);
+    const zipOverride =
+      activeLocation?.zip ??
+      (isZipMatch && !cityOverride && !countyOverride ? trimmedInput : undefined);
 
     const shouldSearch =
-      cities.length > 0 || !!county || !!minPrice || !!maxPrice || !!beds || !!baths || isZip;
+      !!cityOverride || !!countyOverride || !!zipOverride || !!minPrice || !!maxPrice || !!beds || !!baths;
 
     if (!shouldSearch) return;
 
     handleSearchWithFilters(
       trimmedInput,
-      undefined,
-      county ?? undefined,
-      isZip && cities.length === 0 && !county ? trimmedInput : undefined
+      cityOverride,
+      countyOverride,
+      zipOverride
     );
-  }, [filters, searchInput]);
+  }, [filters, searchInput, activeLocation]);
 
+  // Keep sort scoped to the active location as well
   useEffect(() => {
-    handleSearchWithFilters(searchInput.trim(), undefined, filters.county ?? undefined);
-  }, [sortOrder]);
+    const trimmed = searchInput.trim();
+    const cityOverride = activeLocation?.city ?? (filters.cities.length > 0 ? filters.cities[0] : undefined);
+    const countyOverride = activeLocation?.county ?? (filters.county ?? undefined);
+    const zipOverride = activeLocation?.zip;
+    handleSearchWithFilters(trimmed, cityOverride, countyOverride, zipOverride);
+  }, [sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prevent background scroll when mobile filters modal is open
   useEffect(() => {
@@ -234,22 +276,34 @@ function ListingsPageInner() {
     }
   };
 
+  // Add optional labelOverride to keep full address label when provided
   const handleSearchWithFilters = async (
     input: string,
     cityOverride?: string,
     countyOverride?: string,
     zipOverride?: string,
     cursorParam: QueryDocumentSnapshot<DocumentData> | null = null,
+    labelOverride?: string,
   ) => {
-    if (/^\d{5}$/.test(input) && !zipOverride) {
+    // Don't auto-force ZIP if the user has selected a city/county (or overrides are provided)
+    const hasLocationContext =
+      !!cityOverride || !!countyOverride || filters.cities.length > 0 || !!filters.county || !!activeLocation;
+
+    if (/^\d{5}$/.test(input) && !zipOverride && !hasLocationContext) {
       setIsZip(true);
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
-      setSearchLocationLabel(`ZIP Code ${input}`);
-      handleSearchWithFilters(input, undefined, undefined, input);
-      return;
+      zipOverride = input; // promote instead of recursive re-entry
     }
   
-    setSearchLocationLabel(input);
+    // Prefer explicit labelOverride (e.g., full address) over ZIP label
+    setSearchLocationLabel(
+      labelOverride ??
+      (zipOverride
+        ? `ZIP Code ${zipOverride}`
+        : cityOverride
+          ? cityOverride
+          : countyOverride ?? input)
+    );
   
     const shouldSearch =
       cityOverride || countyOverride || zipOverride ||
@@ -274,7 +328,7 @@ function ListingsPageInner() {
       }
   
       const { listings: newListings, nextPageCursor, zipFallback } = await getPublicListings({
-        pageSize: isDesktop ? 40 : 20, // ✅ fewer on mobile
+        pageSize: isDesktop ? 40 : 20, // fewer on mobile
         cursor: cursorParam,
         orderField: field,
         orderDirection: direction,
@@ -284,7 +338,7 @@ function ListingsPageInner() {
         exactBeds: filters.exactBeds,
         baths: filters.baths ? parseInt(filters.baths) : undefined,
   
-        // ⬇️ CHANGED: cities now override county when present
+        // cities override county when present; zip wins over both
         cities: zipOverride
           ? undefined
           : cityOverride
@@ -327,13 +381,15 @@ function ListingsPageInner() {
     zip?: string
   ) => {
     setSearchInput(input);
-    setSearchLocationLabel(input);
 
     if (zip) {
+      // Keep label as the full address the user selected, but query by ZIP
       setFilters((prev) => ({ ...prev, cities: [], county: null }));
-      handleSearchWithFilters(input, undefined, undefined, zip, null);
+      setActiveLocation({ zip }); // ✅ remember the ZIP so later effects stay scoped
+      handleSearchWithFilters(input, undefined, undefined, zip, null, input); // pass labelOverride
     } else if (county === "Denver County") {
       setFilters((prev) => ({ ...prev, cities: [], county: "Denver County" }));
+      setActiveLocation({ county: "Denver County" });
       handleSearchWithFilters(input, undefined, "Denver County", undefined, null);
     } else {
       setFilters((prev) => ({
@@ -341,6 +397,7 @@ function ListingsPageInner() {
         cities: city ? [city] : [],
         county: county ?? null,
       }));
+      setActiveLocation({ city: city || undefined, county: county || undefined });
       handleSearchWithFilters(input, city, county, undefined, null);
     }
 
@@ -364,7 +421,7 @@ function ListingsPageInner() {
     }
   
     const { listings: newListings, nextPageCursor } = await getPublicListings({
-      pageSize: isDesktop ? 40 : 20, // ✅ fewer on mobile
+      pageSize: isDesktop ? 40 : 20, // fewer on mobile
       cursor: reset ? null : cursorDoc,
       orderField: field,
       orderDirection: direction,
@@ -385,26 +442,33 @@ function ListingsPageInner() {
   
 
   const handleLoadMore = () => {
-    // ✅ MAIN INTERACTION: load more
+    // MAIN INTERACTION: load more
     track("listings_load_more_click", { hasCursor: !!cursorDoc });
-    handleSearchWithFilters(searchInput, undefined, filters.county ?? undefined, undefined, cursorDoc);
+    const trimmed = searchInput.trim();
+    const cityOverride = activeLocation?.city ?? (filters.cities.length > 0 ? filters.cities[0] : undefined);
+    const countyOverride = activeLocation?.county ?? (filters.county ?? undefined);
+    const zipOverride = activeLocation?.zip;
+    handleSearchWithFilters(trimmed, cityOverride, countyOverride, zipOverride, cursorDoc);
   };
 
   const setCities = (value: string[] | ((prev: string[]) => string[])) => {
-    setFilters(prev => ({
-      ...prev,
-      cities: typeof value === 'function' ? value(prev.cities) : value,
-    }));
+    setFilters(prev => {
+      const nextCities = typeof value === 'function' ? value(prev.cities) : value;
+      // ✅ keep activeLocation in sync when user chooses city via filters
+      setActiveLocation(al => ({ ...(al || {}), city: nextCities[0], zip: undefined, county: undefined }));
+      return { ...prev, cities: nextCities };
+    });
   };
 
   const setCounty = (
     value: string | ((prev: string | null) => string | null) | null
   ) => {
-    setFilters(prev => ({
-      ...prev,
-      county: typeof value === 'function' ? value(prev.county) : value,
-      cities: [],
-    }));
+    setFilters(prev => {
+      const nextCounty = typeof value === 'function' ? value(prev.county) : value;
+      // ✅ keep activeLocation in sync when user chooses county via filters
+      setActiveLocation(al => ({ ...(al || {}), county: nextCounty || undefined, city: undefined, zip: undefined }));
+      return { ...prev, county: nextCounty, cities: [] };
+    });
   };
 
   const closeExpanded = () => setExpandedId(null);
@@ -417,7 +481,7 @@ function ListingsPageInner() {
       <NavBar />
       <div className="min-h-screen px-6 pb-6 pt-20 bg-gray-50 text-black relative">
 
-        {/* ✅ Mobile-only sticky SearchBar (centered & full width) */}
+        {/* Mobile-only sticky SearchBar (centered & full width) */}
         <div className="lg:hidden sticky top-[70px] z-20 bg-gray-50 py-3">
           <div className="w-full px-0">
             <SearchBar
@@ -430,13 +494,12 @@ function ListingsPageInner() {
           </div>
         </div>
 
-        {/* ✅ Mobile Filters toggle */}
+        {/* Mobile Filters toggle */}
         <div className="lg:hidden mb-3">
           <button
             onClick={() => {
               const next = !showFilters;
               setShowFilters(next);
-              // ✅ MAIN INTERACTION: toggle filters sheet
               track("filters_toggle", { open: next });
             }}
             aria-expanded={showFilters}
@@ -446,7 +509,7 @@ function ListingsPageInner() {
           </button>
         </div>
 
-        {/* ✅ Desktop filters: sticky & always visible */}
+        {/* Desktop filters: sticky & always visible */}
         <div className="hidden lg:block sticky top-[85px] z-40 bg-gray-50 py-3">
           <FiltersBar
             searchInput={searchInput}
@@ -459,7 +522,7 @@ function ListingsPageInner() {
           />
         </div>
 
-        {/* ✅ Mobile filters as a TOP modal (over everything) */}
+        {/* Mobile filters as a TOP modal */}
         {showFilters && (
           <div className="lg:hidden fixed inset-0 z-[100]">
             {/* overlay */}
@@ -467,19 +530,17 @@ function ListingsPageInner() {
               className="absolute inset-0 bg-black/50"
               onClick={() => {
                 setShowFilters(false);
-                // ✅ MAIN INTERACTION: close filters via backdrop
                 track("filters_sheet_close", { via: "backdrop" });
               }}
               aria-hidden="true"
             />
-            {/* sheet at the TOP */}
+            {/* sheet */}
             <div className="absolute top-0 left-0 right-0 max-h-[90vh] bg-white rounded-b-2xl shadow-2xl p-4 overflow-visible">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-base font-semibold">Filters</h3>
                 <button
                   onClick={() => {
                     setShowFilters(false);
-                    // ✅ MAIN INTERACTION: close filters via button
                     track("filters_sheet_close", { via: "button" });
                   }}
                   className="text-sm px-3 py-1 border rounded"
@@ -502,7 +563,6 @@ function ListingsPageInner() {
               <button
                 onClick={() => {
                   setShowFilters(false);
-                  // ✅ MAIN INTERACTION: apply filters
                   track("filters_apply_click");
                 }}
                 className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded"
@@ -531,7 +591,6 @@ function ListingsPageInner() {
             value={sortOrder}
             onChange={(e) => {
               setSortOrder(e.target.value);
-              // ✅ MAIN INTERACTION: sort change
               const [field = "(default)", dir = "(default)"] = (e.target.value || "_").split("_");
               track("sort_change", { field, dir });
             }}
@@ -553,14 +612,13 @@ function ListingsPageInner() {
               loading={loading}
               onExpand={(id) => {
                 setExpandedId(id);
-                // ✅ MAIN INTERACTION: expand listing card
                 track("listing_expand", { listingId: id });
               }}
               onLoadMore={handleLoadMore}
             />
           </div>
 
-        {/* ✅ Only mount Map on desktop */}
+          {/* Only mount Map on desktop */}
           {isDesktop && (
             <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
               <MapView listings={listings} />
@@ -573,7 +631,6 @@ function ListingsPageInner() {
             <div
               className="absolute inset-0 bg-black bg-opacity-50"
               onClick={() => {
-                // ✅ MAIN INTERACTION: close overlay via backdrop
                 track("listing_overlay_close", { listingId: expandedListing.id, via: "backdrop" });
                 closeExpanded();
               }}
@@ -582,12 +639,11 @@ function ListingsPageInner() {
               listing={expandedListing}
               isExpanded={true}
               onClose={() => {
-                // ✅ MAIN INTERACTION: close overlay via close button
                 track("listing_overlay_close", { listingId: expandedListing.id, via: "button" });
                 closeExpanded();
               }}
               onInquire={handleInquire}
-              useMobileCarousel={!isDesktop} // ✅ only necessary change
+              useMobileCarousel={!isDesktop}
             />
           </div>
         )}
