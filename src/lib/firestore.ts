@@ -205,29 +205,62 @@ import {
     try {
       const listingsRef = collection(db, "public_listings");
   
-      let q = query(
-        listingsRef,
-        where("City", "==", city),
-        orderBy("PriceNum", "desc"),
-        limit(6)
-      );
+      // Assortment plan: pull a few from each price band (>= $400k)
+      const MIN = 400_000;
+      const bands = [
+        { min: MIN,      max: 700_000,  take: 2 }, // low
+        { min: 700_000,  max: 1_200_000, take: 2 }, // mid
+        { min: 1_200_000, max: null,     take: 2 }, // high+
+      ];
   
-      let snapshot = await getDocs(q);
+      const picked = new Map<string, any>();
   
-      if (snapshot.empty) {
-        q = query(
-          listingsRef,
-          where("City", "==", "Denver"),
-          orderBy("PriceNum", "desc"),
-          limit(6)
-        );
-        snapshot = await getDocs(q);
+      // Helper to run banded queries for a city
+      const fillFromCity = async (cityName: string) => {
+        for (const band of bands) {
+          const constraints: any[] = [
+            where("City", "==", cityName),
+            where("PriceNum", ">=", band.min),
+            orderBy("PriceNum", "desc"),
+            limit(band.take),
+          ];
+          if (band.max != null) constraints.splice(2, 0, where("PriceNum", "<", band.max)); // add upper bound before orderBy
+  
+          const q = query(listingsRef, ...constraints);
+          const snap = await getDocs(q);
+          snap.forEach((d) => {
+            if (!picked.has(d.id)) picked.set(d.id, { id: d.id, ...d.data() });
+          });
+        }
+  
+        // Top-up if we still have fewer than 6
+        if (picked.size < 6) {
+          const qTop = query(
+            listingsRef,
+            where("City", "==", cityName),
+            where("PriceNum", ">=", MIN),
+            orderBy("PriceNum", "desc"),
+            limit(12)
+          );
+          const snapTop = await getDocs(qTop);
+          snapTop.forEach((d) => {
+            if (picked.size < 6 && !picked.has(d.id)) {
+              picked.set(d.id, { id: d.id, ...d.data() });
+            }
+          });
+        }
+      };
+  
+      // Try requested city first
+      await fillFromCity(city);
+  
+      // Fallback to Denver if nothing found
+      if (picked.size === 0) {
+        await fillFromCity("Denver");
       }
   
-      return snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      // Shuffle so the band order doesn't appear in the UI, then cap at 6
+      return shuffleArray(Array.from(picked.values())).slice(0, 6);
     } catch (error) {
       console.error("Error fetching recommended listings:", error);
       return [];

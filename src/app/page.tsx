@@ -48,7 +48,7 @@ export default function HomePage() {
         const res = await fetch("https://ipapi.co/json/");
         if (!res.ok) throw new Error("IP lookup failed");
         const geo = await res.json();
-        const city = geo.city;
+        const city = geo.city; // ✅ fixed
 
         track("homepage_geo_detect", { city: city || "(unknown)" });
 
@@ -98,8 +98,12 @@ export default function HomePage() {
         >
           <div className="absolute inset-0 bg-black/40 flex items-center px-6 md:px-12 lg:px-24">
             <div className="text-left max-w-2xl ml-0 sm:ml-12">
-              {/* ONLY CHANGE: slightly larger mobile font, still one line */}
-              <h1 className="text-white font-bold mb-6 drop-shadow-md whitespace-nowrap leading-tight text-[clamp(1.4rem,6.9vw,1.9rem)] sm:text-5xl">
+              {/* MOBILE ONLY: smaller so it fits one line */}
+              <h1 className="lg:hidden text-white font-extrabold mb-6 drop-shadow-md leading-tight whitespace-nowrap text-[clamp(1.6rem,7.2vw,2.4rem)]">
+                Real Estate, Refined
+              </h1>
+              {/* DESKTOP ONLY: keep original */}
+              <h1 className="hidden lg:block text-white font-bold mb-6 drop-shadow-md whitespace-nowrap leading-tight text-5xl">
                 Your next move starts here.
               </h1>
               <SearchBar
@@ -135,9 +139,10 @@ export default function HomePage() {
               </h2>
 
               <div className="relative">
+                {/* ⬇️ Hide arrows on mobile; show on lg+ */}
                 <button
                   onClick={scrollLeft}
-                  className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
+                  className="hidden lg:block absolute left-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
                 >
                   <ChevronLeft className="text-black w-6 h-6" />
                 </button>
@@ -178,7 +183,7 @@ export default function HomePage() {
 
                 <button
                   onClick={scrollRight}
-                  className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
+                  className="hidden lg:block absolute right-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
                 >
                   <ChevronRight className="text-black w-6 h-6" />
                 </button>
