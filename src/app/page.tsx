@@ -48,7 +48,7 @@ export default function HomePage() {
         const res = await fetch("https://ipapi.co/json/");
         if (!res.ok) throw new Error("IP lookup failed");
         const geo = await res.json();
-        const city = geo.city; // ✅ fixed
+        const city = geo.city;
 
         track("homepage_geo_detect", { city: city || "(unknown)" });
 
@@ -93,17 +93,15 @@ export default function HomePage() {
         <NavBar />
 
         {/* Hero Banner with Image and Search */}
-        <div
-          className="hero-bg relative w-full bg-cover bg-bottom lg:bg-center h-[360px] sm:h-[440px] lg:h-[520px]"
-        >
+        <div className="hero-bg relative w-full bg-cover bg-bottom lg:bg-center h-[360px] sm:h-[440px] lg:h-[520px]">
           <div className="absolute inset-0 bg-black/40 flex items-center px-6 md:px-12 lg:px-24">
             <div className="text-left max-w-2xl ml-0 sm:ml-12">
-              {/* MOBILE ONLY: smaller so it fits one line */}
-              <h1 className="lg:hidden text-white font-extrabold mb-6 drop-shadow-md leading-tight whitespace-nowrap text-[clamp(1.6rem,7.2vw,2.4rem)]">
+              {/* PHONE ONLY */}
+              <h1 className="md:hidden text-white font-extrabold mb-6 drop-shadow-md leading-tight whitespace-nowrap text-[clamp(1.6rem,7.2vw,2.4rem)]">
                 Real Estate, Refined
               </h1>
-              {/* DESKTOP ONLY: keep original */}
-              <h1 className="hidden lg:block text-white font-bold mb-6 drop-shadow-md whitespace-nowrap leading-tight text-5xl">
+              {/* TABLET + DESKTOP (iPad Mini shows this) */}
+              <h1 className="hidden md:block text-white font-bold mb-6 drop-shadow-md whitespace-nowrap leading-tight text-5xl">
                 Your next move starts here.
               </h1>
               <SearchBar
@@ -139,7 +137,7 @@ export default function HomePage() {
               </h2>
 
               <div className="relative">
-                {/* ⬇️ Hide arrows on mobile; show on lg+ */}
+                {/* ⬇️ Hide arrows on phones; show on lg+ */}
                 <button
                   onClick={scrollLeft}
                   className="hidden lg:block absolute left-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow z-10"
@@ -148,7 +146,7 @@ export default function HomePage() {
                 </button>
 
                 <div ref={scrollRef} className="overflow-x-auto scroll-smooth no-scrollbar">
-                  <div className="flex gap-6">
+                  <div className="trending-row flex gap-6">
                     {recommended.map((listing) => (
                       <div
                         key={listing.id}
@@ -158,22 +156,22 @@ export default function HomePage() {
                           setExpandedId(listing.id);
                           track("listing_expand", { source: "trending", listingId: listing.id });
                         }}
-                        className="min-w-[280px] max-w-[280px] bg-white border border-gray-200 rounded-xl p-4 shadow-md shrink-0 transition-transform duration-300 cursor-pointer hover:scale-[1.03]"
+                        className="trending-card bg-white border border-gray-200 rounded-xl p-4 shadow-md shrink-0 transition-transform duration-300 cursor-pointer hover:scale-[1.03]"
                       >
                         <Image
                           src={listing.Image}
                           alt={listing.Address || "Listing photo"}
-                          width={400}
-                          height={300}
-                          className="rounded mb-4 object-cover w-full h-[180px]"
+                          width={500}
+                          height={375}
+                          className="trending-img rounded mb-4 object-cover w-full"
                         />
-                        <h3 className="text-lg font-semibold text-[#0E0E0B] truncate">
+                        <h3 className="trending-title font-semibold text-[#0E0E0B] truncate">
                           {listing.Address}
                         </h3>
-                        <p className="text-gray-700 text-sm">
+                        <p className="trending-meta text-gray-700">
                           {listing.Beds} beds • {listing.Baths} baths
                         </p>
-                        <p className="text-gray-900 font-bold text-base mt-1">
+                        <p className="trending-price text-gray-900 font-bold mt-1">
                           {listing.Price}
                         </p>
                       </div>
@@ -221,7 +219,7 @@ export default function HomePage() {
         <Footer />
       </div>
 
-      {/* Scoped CSS: desktop uses existing image; mobile swaps to the blurred house image */}
+      {/* Scoped CSS: hero bg + Trending responsive scale */}
       <style jsx>{`
         .hero-bg {
           background-image: url("/homepage-real-estate-banner.png");
@@ -230,6 +228,64 @@ export default function HomePage() {
           .hero-bg {
             background-image: url("/topluxurylistings-homepagebackground-mobile.png");
           }
+        }
+
+        /* Trending base (phones) */
+        .trending-card { min-width: 280px; max-width: 280px; }
+        .trending-img { height: 180px; }
+        .trending-title { font-size: 1.125rem; } /* 18px */
+        .trending-meta { font-size: 0.875rem; }  /* 14px */
+        .trending-price { font-size: 1rem; }     /* 16px */
+
+        /* iPad mini & general md (≥768) */
+        @media (min-width: 768px) {
+          .trending-card { min-width: 300px; max-width: 300px; }
+          .trending-img { height: 200px; }
+        }
+
+        /* iPad Air portrait (≥820) — bigger */
+        @media (min-width: 820px) {
+          .trending-row { gap: 3rem; } /* 48px */
+          .trending-card { min-width: 440px; max-width: 440px; }
+          .trending-img { height: 320px; }
+          .trending-title { font-size: 1.7rem; }   /* ~27.2px */
+          .trending-meta { font-size: 1.15rem; }   /* ~18.4px */
+          .trending-price { font-size: 1.6rem; }   /* 25.6px */
+        }
+
+        /* iPad Pro 11" portrait (≥834) — a bit bigger */
+        @media (min-width: 834px) {
+          .trending-row { gap: 3.25rem; } /* 52px */
+          .trending-card { min-width: 460px; max-width: 460px; }
+          .trending-img { height: 335px; }
+        }
+
+        /* Surface Pro 7 width (≥912) — bigger as requested */
+        @media (min-width: 912px) {
+          .trending-card { min-width: 480px; max-width: 480px; }
+          .trending-img { height: 360px; }
+          .trending-title { font-size: 1.875rem; } /* 30px */
+          .trending-price { font-size: 1.75rem; }  /* 28px */
+        }
+
+        /* Desktop (≥1024) — REVERT to original desktop sizes */
+        @media (min-width: 1024px) {
+          .trending-row { gap: 1.5rem; }           /* matches gap-6 (24px) */
+          .trending-card { min-width: 280px; max-width: 280px; }
+          .trending-img { height: 180px; }
+          .trending-title { font-size: 1.125rem; } /* 18px */
+          .trending-meta { font-size: 0.875rem; }  /* 14px */
+          .trending-price { font-size: 1rem; }     /* 16px */
+        }
+
+        /* iPad Pro 12.9" portrait (viewport width = 1024px) — upscale to match/better iPad Air */
+        @media (width: 1024px) and (orientation: portrait) {
+          .trending-row { gap: 3rem; }
+          .trending-card { min-width: 480px; max-width: 480px; }
+          .trending-img { height: 360px; }
+          .trending-title { font-size: 1.875rem; } /* 30px */
+          .trending-meta { font-size: 1.15rem; }   /* ~18.4px */
+          .trending-price { font-size: 1.75rem; }  /* 28px */
         }
       `}</style>
     </GoogleMapsLoader>

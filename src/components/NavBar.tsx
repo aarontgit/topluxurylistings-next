@@ -82,7 +82,7 @@ export default function NavBar() {
             track("nav_click", { item: "logo", location: getViewportLocation(), href: "/" })
           }
         >
-          {/* Desktop view (logo + text) */}
+          {/* Desktop/tablet view (logo always; text returns at ≥912px) */}
           <div className="hidden md:flex items-center space-x-2">
             <div className="relative w-14 h-14">
               <Image
@@ -92,7 +92,7 @@ export default function NavBar() {
                 className="object-contain"
               />
             </div>
-            <span className="text-2xl font-bold text-gray-900 tracking-wide">
+            <span className="hidden min-[912px]:inline text-2xl font-bold text-gray-900 tracking-wide">
               Top Luxury Listings
             </span>
           </div>
@@ -102,7 +102,7 @@ export default function NavBar() {
           </span>
         </Link>
 
-        {/* Desktop nav */}
+        {/* Desktop nav (visible from md up) */}
         <div className="hidden md:flex items-center justify-between w-full text-sm font-semibold">
           {/* Left links */}
           <div className="flex space-x-8">
@@ -178,7 +178,7 @@ export default function NavBar() {
           </div>
         </div>
 
-        {/* Hamburger for mobile */}
+        {/* Hamburger for mobile (<md) */}
         <button
           className="md:hidden flex items-center"
           aria-label="Open menu"
