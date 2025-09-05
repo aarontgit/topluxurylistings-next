@@ -290,6 +290,7 @@ export default function ListingCard({
                   onClick={(e) => {
                     e.stopPropagation();
                     track("listing_contact_agent_click", { listingId, location: "sidebar" });
+                    onInquire?.(listing); {/* ← added to Contact Agent (desktop) */}
                   }}
                   className="bg-white text-blue-600 border border-blue-600 py-2 px-6 text-sm rounded hover:bg-blue-50 w-full mt-2"
                 >
@@ -315,6 +316,7 @@ export default function ListingCard({
                   onClick={(e) => {
                     e.stopPropagation();
                     track("listing_contact_agent_click", { listingId, location: "mobile_cta" });
+                    onInquire?.(listing); {/* ← added to Contact Agent (mobile) */}
                   }}
                   className="bg-white text-blue-600 border border-blue-600 py-3 text-sm rounded hover:bg-blue-50 w-full"
                 >

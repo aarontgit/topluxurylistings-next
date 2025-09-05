@@ -12,6 +12,13 @@ import { useRouter } from "next/navigation";
 import GoogleMapsLoader from "components/GoogleMapsLoader";
 import ListingCard from "../components/ListingCard";
 
+/* ⬇️ NEW: auth + modal imports (minimal) */
+import AuthModal from "../components/AuthModal";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged } from "firebase/auth";
+import type { User } from "firebase/auth";
+import { app } from "../lib/firebase";
+import { ensureUserDocument } from "../lib/createUserDoc";
+
 export default function HomePage() {
   const [recommended, setRecommended] = useState<any[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -87,6 +94,60 @@ export default function HomePage() {
 
   const selectedListing = recommended.find((l) => l.id === expandedId);
 
+  /* ⬇️ NEW: auth state + modal (match Buy page flow) */
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+  const [user, setUser] = useState<User | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [pendingInquireListing, setPendingInquireListing] = useState<any | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) await ensureUserDocument();
+    });
+    return () => unsubscribe();
+  }, []); // minimal deps
+
+  /* ⬇️ UPDATED: send to Firestore (via /api/inquire) then route to Contact */
+  const handleInquire = async (listing: any) => {
+    if (!auth.currentUser) {
+      setPendingInquireListing(listing);
+      setAuthModalOpen(true);
+      return;
+    }
+
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch("/api/inquire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, address: listing.Address }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to inquire");
+
+      alert(`Thanks for your interest in ${listing.Address}! We'll be in touch soon.`);
+    } catch (err) {
+      console.error("❌ Inquiry error:", err);
+      alert("There was a problem submitting your inquiry.");
+    } finally {
+      const note = `I am interested in ${listing?.Address ?? ""}`;
+      const qs = new URLSearchParams({ interest: "buying", notes: note });
+      router.push(`/contact?${qs.toString()}`);
+    }
+  };
+
+  /* ⬇️ NEW: continue pending inquiry after auth success */
+  const handleAuthSuccess = async () => {
+    setAuthModalOpen(false);
+    if (pendingInquireListing) {
+      await handleInquire(pendingInquireListing);
+      setPendingInquireListing(null);
+    }
+  };
+
   return (
     <GoogleMapsLoader>
       <div className="min-h-screen flex flex-col relative">
@@ -94,8 +155,8 @@ export default function HomePage() {
 
         {/* Hero Banner with Image and Search */}
         <div className="hero-bg relative w-full bg-cover bg-bottom lg:bg-center h-[360px] sm:h-[440px] lg:h-[520px]">
-          <div className="absolute inset-0 bg-black/40 flex items-center px-6 md:px-12 lg:px-24">
-            <div className="text-left max-w-2xl ml-0 sm:ml-12">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center md:justify-start px-6 md:px-12 lg:px-24">
+            <div className="text-center md:text-left max-w-2xl md:ml-12 mx-auto">
               {/* PHONE ONLY */}
               <h1 className="md:hidden text-white font-extrabold mb-6 drop-shadow-md leading-tight whitespace-nowrap text-[clamp(1.6rem,7.2vw,2.4rem)]">
                 Real Estate, Refined
@@ -210,11 +271,15 @@ export default function HomePage() {
                   track("listing_overlay_close", { source: "trending", via: "button" });
                   setExpandedId(null);
                 }}
+                onInquire={handleInquire} 
                 useMobileCarousel={!isDesktop}
               />
             </div>
           </div>
         )}
+
+        {/* ⬇️ NEW: mount AuthModal when needed */}
+        {authModalOpen && <AuthModal onClose={handleAuthSuccess} />}
 
         <Footer />
       </div>

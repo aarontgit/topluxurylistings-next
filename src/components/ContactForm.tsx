@@ -29,15 +29,24 @@ export default function ContactForm() {
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const searchParams = useSearchParams(); // ✅ added
+  const [notesPrefill, setNotesPrefill] = useState(""); // ✅ added
 
   // ✅ prefill interest from query (?interest=prep|selling|buying|info|other)
   useEffect(() => {
     const q = searchParams.get("interest");
-    if (!q) return;
-    const valid = new Set(OPTIONS.map(o => o.code));
-    if (valid.has(q as InterestCode)) {
-      setInterestCode(q as InterestCode);
-      (window as any)?.gtag?.("event", "contact_interest_prefill", { interest: q });
+    if (q) {
+      const valid = new Set(OPTIONS.map(o => o.code));
+      if (valid.has(q as InterestCode)) {
+        setInterestCode(q as InterestCode);
+        (window as any)?.gtag?.("event", "contact_interest_prefill", { interest: q });
+      }
+    }
+    // ✅ prefill notes from query (?notes=...)
+    const nRaw = searchParams.get("notes");
+    if (nRaw) {
+      const n = nRaw.replace(/\+/g, " "); // handle '+' from URL encoding if present
+      setNotesPrefill(n);
+      (window as any)?.gtag?.("event", "contact_notes_prefill", { source: "query" });
     }
   }, [searchParams]); // minimal deps
 
@@ -192,6 +201,7 @@ export default function ContactForm() {
           name="notes"
           placeholder="Tell us anything else (optional)"
           className="w-full p-3 rounded border border-gray-300"
+          defaultValue={notesPrefill} // ✅ prefilled from query
         />
 
         <div className="flex items-center">

@@ -14,10 +14,15 @@ type Listing = {
   [key: string]: any;
 };
 
+type MapViewProps = {
+  listings: Listing[];
+  onInquire?: (listing: Listing) => void; // ⬅️ NEW
+};
+
 const containerStyle = { width: "100%", height: "100%" };
 const centerOfColorado = { lat: 39.5501, lng: -105.7821 };
 
-export default function MapView({ listings }: { listings: Listing[] }) {
+export default function MapView({ listings, onInquire }: MapViewProps) { // ⬅️ CHANGED
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cardDirection, setCardDirection] = useState<"above" | "below">("above");
@@ -149,6 +154,7 @@ export default function MapView({ listings }: { listings: Listing[] }) {
                   track("map_card_preview_close", { listingId: selectedListing.id, via: "close_in_card" });
                   setSelectedId(null);
                 }}
+                onInquire={onInquire} 
               />
             </div>
           </OverlayView>
@@ -236,6 +242,7 @@ export default function MapView({ listings }: { listings: Listing[] }) {
                   setSelectedId(null);
                   setIsExpanded(false);
                 }}
+                onInquire={onInquire} 
               />
             </div>
           </div>,

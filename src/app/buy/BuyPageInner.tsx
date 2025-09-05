@@ -23,7 +23,7 @@ import { app } from "../../lib/firebase";
 import { ensureUserDocument } from "../../lib/createUserDoc";
 import type { User } from "firebase/auth";
 import type { QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 
 type Listing = {
@@ -109,7 +109,8 @@ function ListingsPageInner() {
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(min-width: 1024px)");
+    // 1025 so iPad Pro (1024px) is NOT treated as desktop
+    const mq = window.matchMedia("(min-width: 1025px)");
     const onChange = (e: MediaQueryListEvent | MediaQueryList) =>
       setIsDesktop(("matches" in e ? e.matches : (e as MediaQueryList).matches));
     onChange(mq);
@@ -121,6 +122,7 @@ function ListingsPageInner() {
   const [showFilters, setShowFilters] = useState(false);
 
   const searchParams = useSearchParams();
+  const router = useRouter();
   const inputFromParams = searchParams.get("input");
 
   // Apply URL params only once (including input)
@@ -277,9 +279,17 @@ function ListingsPageInner() {
       if (!res.ok) throw new Error(data.error || 'Failed to inquire');
 
       alert(`Thanks for your interest in ${listing.Address}! We'll be in touch soon.`);
+      // ➜ After existing flow, send to Contact with prefilled interest & notes
+      const note = `I am interested in ${listing.Address ?? ""}`;
+      const qs = new URLSearchParams({ interest: "buying", notes: note });
+      router.push(`/contact?${qs.toString()}`);
     } catch (err: any) {
       console.error('❌ Inquiry error:', err.message);
       alert("There was a problem submitting your inquiry.");
+      // Still send them to Contact so they can reach out
+      const note = `I am interested in ${listing.Address ?? ""}`;
+      const qs = new URLSearchParams({ interest: "buying", notes: note });
+      router.push(`/contact?${qs.toString()}`);
     }
   };
 
@@ -511,6 +521,9 @@ function ListingsPageInner() {
   // Choose preposition: "near" for addresses, otherwise "in"
   const showPrepositionNear = pinnedLabel ? pinnedIsAddress : isLikelyAddress(searchLocationLabel);
 
+  // ✅ allow passing extra props to MapView without TS errors
+  const MapViewAny = MapView as any;
+
   return (
     <>
       <NavBar />
@@ -635,7 +648,7 @@ function ListingsPageInner() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="w-full lg:w-1/2">
+          <div className={`w-full ${isDesktop ? 'lg:w-1/2' : ''}`}>
             <ListingsGrid
               listings={listings}
               hasMore={hasMore}
@@ -651,7 +664,10 @@ function ListingsPageInner() {
           {/* Only mount Map on desktop */}
           {isDesktop && (
             <div className="hidden lg:block w-full lg:w-1/2 sticky top-[100px] h-[calc(100vh-120px)]">
-              <MapView listings={listings} />
+              <MapViewAny
+                listings={listings}
+                onInquire={handleInquire}  // ensure map-expanded card buttons work
+              />
             </div>
           )}
         </div>
