@@ -4,14 +4,12 @@
 
 import { Suspense } from "react";
 import BuyPageInner from "./BuyPageInner";
-import GoogleMapsLoader from "components/GoogleMapsLoader";
+//import GoogleMapsLoader from "components/GoogleMapsLoader";
 
 export default function ListingsPage() {
   return (
     <Suspense fallback={null}>
-      <GoogleMapsLoader>
       <BuyPageInner />
-      </GoogleMapsLoader>
     </Suspense>
   );
 }

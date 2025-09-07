@@ -9,7 +9,7 @@ export default function ComingSoonPage() {
         <div className="max-w-lg w-full bg-white shadow-xl rounded-2xl p-10 text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Coming Soon</h1>
           <p className="text-lg text-gray-600 mb-6">
-            Our Listings and Agents pages are currently under development.  
+            Our Agents page is currently under development.  
             Stay tuned for exclusive properties and trusted professionals!
           </p>
           <div className="text-gray-400 text-sm">© {new Date().getFullYear()} TopLuxuryListings</div>

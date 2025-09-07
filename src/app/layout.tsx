@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import GtagPageView from "../components/GtagPageview";
 import { Suspense } from "react";
+import GoogleMapsLoader from "../components/GoogleMapsLoader"; // ✅ add this
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,10 +29,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* Google Analytics 4 */}
-        <script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-60DZCQBLGM"
-        />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-60DZCQBLGM" />
         <script
           id="gtag-init"
           dangerouslySetInnerHTML={{
@@ -39,20 +37,20 @@ export default function RootLayout({
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'G-60DZCQBLGM', {
-                page_path: window.location.pathname,
-              });
+              gtag('config', 'G-60DZCQBLGM', { page_path: window.location.pathname });
             `,
           }}
         />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Suspense fallback={null}>
           <GtagPageView />
         </Suspense>
-        {children}
+
+        {/* ✅ Load Google Maps once for the whole app */}
+        <GoogleMapsLoader>
+          {children}
+        </GoogleMapsLoader>
       </body>
     </html>
   );

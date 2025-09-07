@@ -9,13 +9,13 @@ export default function SellPage() {
       <NavBar />
       <div className="bg-white text-gray-900">
         <section
-          className="relative h-[60vh] bg-cover bg-center flex items-center justify-center px-6 text-center text-white"
+          className="relative h-[60vh] bg-cover bg-center flex items-center justify-center px-6 text-center text-white pt-24 sm:pt-0"
           style={{ backgroundImage: "url('/hero2.png')" }}
         >
           <div className="absolute inset-0 bg-black/60" />
           <div className="relative max-w-3xl mx-auto p-8">
-            <h1 className="text-4xl font-bold mb-4">Sell your home with confidence</h1>
-            <p className="text-lg mb-6">
+            <h1 className="text-2xl sm:text-4xl font-bold mb-4">Sell your home with confidence</h1>
+            <p className="text-base sm:text-lg mb-6">
               Whether you work with an agent or take another approach, we’ll help you navigate the
               process and get the most out of your sale.
             </p>

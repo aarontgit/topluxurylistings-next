@@ -9,7 +9,7 @@ import { getRecommendedListings } from "../lib/firestore";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import SearchBar from "../components/SearchBar";
 import { useRouter } from "next/navigation";
-import GoogleMapsLoader from "components/GoogleMapsLoader";
+// import GoogleMapsLoader from "components/GoogleMapsLoader"; // ❌ remove
 import ListingCard from "../components/ListingCard";
 
 /* ⬇️ NEW: auth + modal imports (minimal) */
@@ -149,7 +149,7 @@ export default function HomePage() {
   };
 
   return (
-    <GoogleMapsLoader>
+    <>
       <div className="min-h-screen flex flex-col relative">
         <NavBar />
 
@@ -230,7 +230,7 @@ export default function HomePage() {
                           {listing.Address}
                         </h3>
                         <p className="trending-meta text-gray-700">
-                          {listing.Beds} beds • {listing.Baths} baths
+                          {listing.Beds} • {listing.Baths}
                         </p>
                         <p className="trending-price text-gray-900 font-bold mt-1">
                           {listing.Price}
@@ -271,7 +271,7 @@ export default function HomePage() {
                   track("listing_overlay_close", { source: "trending", via: "button" });
                   setExpandedId(null);
                 }}
-                onInquire={handleInquire} 
+                onInquire={handleInquire}
                 useMobileCarousel={!isDesktop}
               />
             </div>
@@ -353,6 +353,6 @@ export default function HomePage() {
           .trending-price { font-size: 1.75rem; }  /* 28px */
         }
       `}</style>
-    </GoogleMapsLoader>
+    </>
   );
 }

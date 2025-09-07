@@ -105,6 +105,20 @@ function ListingsPageInner() {
   const [pinnedLabel, setPinnedLabel] = useState<string | null>(null);
   const [pinnedIsAddress, setPinnedIsAddress] = useState<boolean>(false);
 
+    // Keep "Showing listings in/near ..." in sync immediately with selection
+  useEffect(() => {
+    const derived =
+      pinnedLabel ??
+      (activeLocation?.zip
+        ? `ZIP Code ${activeLocation.zip}`
+        : activeLocation?.city || activeLocation?.county || null);
+
+    if (derived && derived !== searchLocationLabel) {
+      setSearchLocationLabel(derived);
+    }
+  }, [pinnedLabel, activeLocation]); // intentionally NOT including searchLocationLabel to avoid loops
+
+
   // runtime media query
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {

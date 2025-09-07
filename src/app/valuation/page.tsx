@@ -1,7 +1,7 @@
 import NavBar from "../../components/NavBar";
 import Footer from "../../components/Footer";
 import ValuationTool from "../../components/ValuationTool";
-import GoogleMapsLoader from "../../components/GoogleMapsLoader";
+//import GoogleMapsLoader from "../../components/GoogleMapsLoader";
 
 export default function ValuationPage() {
   return (
@@ -9,9 +9,9 @@ export default function ValuationPage() {
     <div className="min-h-screen bg-white text-gray-900">
       <NavBar />
       <main className="w-full">
-        <GoogleMapsLoader>
+        {/*<GoogleMapsLoader>*/}
         <ValuationTool />
-        </GoogleMapsLoader>
+        {/*</GoogleMapsLoader>*/}
       </main>
       <Footer />
     </div>
