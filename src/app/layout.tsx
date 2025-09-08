@@ -3,7 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import GtagPageView from "../components/GtagPageview";
 import { Suspense } from "react";
-import GoogleMapsLoader from "../components/GoogleMapsLoader"; // ✅ add this
+import GoogleMapsLoader from "../components/GoogleMapsLoader"; // ✅ keep
+import GoogleOneTap from "../components/GoogleOneTap"; // ✅ added
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,11 +42,16 @@ export default function RootLayout({
             `,
           }}
         />
+        {/* ✅ Google Identity Services (One Tap) */}
+        <script async defer src="https://accounts.google.com/gsi/client"></script>
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Suspense fallback={null}>
           <GtagPageView />
         </Suspense>
+
+        {/* ✅ Mount One Tap site-wide */}
+        <GoogleOneTap />
 
         {/* ✅ Load Google Maps once for the whole app */}
         <GoogleMapsLoader>
