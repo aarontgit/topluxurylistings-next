@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { signInWithEmail, signUpWithEmail } from "../lib/auth";
-import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth"; // ✅ changed
+import {
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  FacebookAuthProvider, // ✅ added
+} from "firebase/auth"; // ✅ changed (added FacebookAuthProvider)
 import { auth, provider } from "../lib/firebase";
 import { FirebaseError } from "firebase/app";
 import { ensureUserDocument } from "../lib/createUserDoc";
@@ -29,21 +34,32 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     track("auth_modal_view", { mode });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ✅ Complete redirect flow if we just returned from Google
+  // ✅ Complete redirect flow if we just returned from Google or Facebook
   useEffect(() => {
     (async () => {
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           await ensureUserDocument();
+
           const uid = auth.currentUser?.uid;
-          if (uid) setGaUser(uid, { auth_method: "google" });
-          track("auth_success", { method: "google", via: "redirect_result" });
+          const prov =
+            (result.providerId as string | null) ||
+            result.user.providerData?.[0]?.providerId ||
+            "oauth";
+          const method = prov.includes("facebook")
+            ? "facebook"
+            : prov.includes("google")
+            ? "google"
+            : prov;
+
+          if (uid) setGaUser(uid, { auth_method: method });
+          track("auth_success", { method, via: "redirect_result" });
           onClose();
         }
       } catch (e) {
         console.error("getRedirectResult error:", e);
-        track("auth_error", { where: "google", code: "getRedirectResult_error" });
+        track("auth_error", { where: "oauth_redirect", code: "getRedirectResult_error" });
       }
     })();
   }, []); // run once when modal mounts
@@ -130,7 +146,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         await signInWithPopup(auth, provider);
       } catch (err: any) {
         const code = err?.code as string | undefined;
-        // Fallback to redirect on common popup/cookie/domain issues
         const fallbackCodes = new Set([
           "auth/popup-blocked",
           "auth/popup-closed-by-user",
@@ -142,10 +157,9 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           await signInWithRedirect(auth, provider);
           return;
         }
-        throw err; // unknown error -> show message
+        throw err;
       }
 
-      // Popup succeeded
       await ensureUserDocument();
       const uid = auth.currentUser?.uid;
       if (uid) setGaUser(uid, { auth_method: "google" });
@@ -155,6 +169,53 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
       console.error("Google sign-in failed:", err);
       setError("Google sign-in failed. Please try again.");
       track("auth_error", { where: "google", code: (err as any)?.code || "google_signin_failed" });
+    }
+  };
+
+  // ✅ NEW: Facebook OAuth flow (popup → redirect fallback)
+  const fbProvider = new FacebookAuthProvider(); // local instance to avoid touching lib/firebase
+  const handleFacebookAuth = async () => {
+    try {
+      track("auth_sign_in_click", { source: "auth_modal", method: "facebook" });
+
+      // Ask for basic scopes; email is common for contact
+      fbProvider.addScope?.("email");
+
+      if (await shouldForceRedirect()) {
+        await signInWithRedirect(auth, fbProvider);
+        return;
+      }
+
+      try {
+        await signInWithPopup(auth, fbProvider);
+      } catch (err: any) {
+        const code = err?.code as string | undefined;
+        const fallbackCodes = new Set([
+          "auth/popup-blocked",
+          "auth/popup-closed-by-user",
+          "auth/cancelled-popup-request",
+          "auth/operation-not-supported-in-this-environment",
+          "auth/unauthorized-domain",
+        ]);
+        if (code && fallbackCodes.has(code)) {
+          await signInWithRedirect(auth, fbProvider);
+          return;
+        }
+        throw err;
+      }
+
+      await ensureUserDocument();
+      const uid = auth.currentUser?.uid;
+      if (uid) setGaUser(uid, { auth_method: "facebook" });
+      track("auth_success", { method: "facebook", via: "popup" });
+      onClose();
+    } catch (err) {
+      console.error("Facebook sign-in failed:", err);
+      setError("Facebook sign-in failed. Please try again.");
+      track("auth_error", {
+        where: "facebook",
+        code: (err as any)?.code || "facebook_signin_failed",
+      });
     }
   };
 
@@ -236,6 +297,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           onClick={handleGoogleAuth}
           className="w-full bg-white border border-gray-300 text-black py-3 px-4 rounded-md hover:bg-gray-100 flex items-center space-x-4"
         >
+          {/* Google icon */}
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
             <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
@@ -244,6 +306,21 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
             <path fill="none" d="M0 0h48v48H0z"></path>
           </svg>
           <span>Continue with Google</span>
+        </button>
+
+        {/* ✅ NEW: Facebook button */}
+        <button
+          onClick={handleFacebookAuth}
+          className="w-full bg-white border border-gray-300 text-black py-3 px-4 rounded-md hover:bg-gray-100 flex items-center space-x-4"
+        >
+          {/* Simple Facebook “f” icon */}
+          <svg viewBox="0 0 24 24" className="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M22 12.06C22 6.49 17.52 2 12 2S2 6.49 2 12.06c0 4.99 3.66 9.13 8.44 9.94v-7.03H7.9v-2.91h2.54V9.41c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.24.2 2.24.2v2.48h-1.26c-1.24 0-1.63.77-1.63 1.55v1.86h2.78l-.44 2.91h-2.34V22c4.78-.81 8.44-4.95 8.44-9.94z"
+              fill="currentColor"
+            />
+          </svg>
+          <span>Continue with Facebook</span>
         </button>
 
         <p

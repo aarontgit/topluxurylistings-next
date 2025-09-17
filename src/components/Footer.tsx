@@ -13,6 +13,9 @@ export default function Footer() {
           <Link href="/terms" className="hover:underline">
             Terms of Service
           </Link>
+          <Link href="/dataDelete" className="hover:underline">
+            Data Deletion
+          </Link>
         </div>
       </div>
     </footer>
