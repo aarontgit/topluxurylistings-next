@@ -6,8 +6,11 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  FacebookAuthProvider, // ✅ added
-} from "firebase/auth"; // ✅ changed (added FacebookAuthProvider)
+  FacebookAuthProvider, // ✅ existing
+  fetchSignInMethodsForEmail,   // ✅ NEW
+  linkWithCredential,           // ✅ NEW
+  signInWithEmailAndPassword,   // ✅ NEW
+} from "firebase/auth"; // ✅ changed (added new imports)
 import { auth, provider } from "../lib/firebase";
 import { FirebaseError } from "firebase/app";
 import { ensureUserDocument } from "../lib/createUserDoc";
@@ -172,13 +175,12 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // ✅ NEW: Facebook OAuth flow (popup → redirect fallback)
+  // ✅ REPLACED: Facebook OAuth flow with merge-handling
   const fbProvider = new FacebookAuthProvider(); // local instance to avoid touching lib/firebase
   const handleFacebookAuth = async () => {
     try {
       track("auth_sign_in_click", { source: "auth_modal", method: "facebook" });
 
-      // Ask for basic scopes; email is common for contact
       fbProvider.addScope?.("email");
 
       if (await shouldForceRedirect()) {
@@ -190,6 +192,8 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         await signInWithPopup(auth, fbProvider);
       } catch (err: any) {
         const code = err?.code as string | undefined;
+
+        // Popup fallback paths
         const fallbackCodes = new Set([
           "auth/popup-blocked",
           "auth/popup-closed-by-user",
@@ -201,9 +205,66 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           await signInWithRedirect(auth, fbProvider);
           return;
         }
+
+        // ✅ Handle merge conflict: auth/account-exists-with-different-credential
+        if (code === "auth/account-exists-with-different-credential") {
+          const pendingCred = FacebookAuthProvider.credentialFromError(err);
+          const conflictEmail = (err?.customData?.email as string | undefined) || email;
+
+          if (!conflictEmail || !pendingCred) throw err;
+
+          const methods = await fetchSignInMethodsForEmail(auth, conflictEmail);
+
+          // A) Existing Google account → sign in with Google, then link FB
+          if (methods.includes("google.com")) {
+            await signInWithPopup(auth, provider); // existing Google provider from ../lib/firebase
+            if (!auth.currentUser) throw err;
+            await linkWithCredential(auth.currentUser, pendingCred);
+
+            await ensureUserDocument();
+            const uid = auth.currentUser?.uid;
+            if (uid) setGaUser(uid, { auth_method: "facebook_linked_google" });
+            track("auth_success", { method: "facebook", via: "popup_link_google" });
+            onClose();
+            return;
+          }
+
+          // B) Existing Email/Password → need password in this modal to proceed
+          if (methods.includes("password")) {
+            if (!password) {
+              setError(
+                "This email already has a password. Enter your password above, then click Facebook again to link."
+              );
+              track("auth_error", { where: "facebook", code: "needs_password_for_link" });
+              return;
+            }
+            await signInWithEmailAndPassword(auth, conflictEmail, password);
+            if (!auth.currentUser) throw err;
+            await linkWithCredential(auth.currentUser, pendingCred);
+
+            await ensureUserDocument();
+            const uid = auth.currentUser?.uid;
+            if (uid) setGaUser(uid, { auth_method: "facebook_linked_password" });
+            track("auth_success", { method: "facebook", via: "popup_link_password" });
+            onClose();
+            return;
+          }
+
+          // C) Some other provider (e.g., Apple)
+          setError(
+            `This email is already registered. Sign in using: ${methods.join(
+              ", "
+            )} first, then try Facebook again to link.`
+          );
+          track("auth_error", { where: "facebook", code: "needs_other_provider_first", methods });
+          return;
+        }
+
+        // Unhandled popup error
         throw err;
       }
 
+      // ✅ Normal success (no merge)
       await ensureUserDocument();
       const uid = auth.currentUser?.uid;
       if (uid) setGaUser(uid, { auth_method: "facebook" });
